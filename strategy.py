@@ -41,7 +41,7 @@ def get_momentum_ranking(lookback_months=3):
     """Calculate momentum for all Nifty 100 stocks."""
     lookback_days = lookback_months * 21
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=lookback_days * 2)
+    start_date = end_date - timedelta(days=max(lookback_days * 2, 60))
 
     results = []
     for ticker in NIFTY_100:
@@ -49,7 +49,7 @@ def get_momentum_ranking(lookback_months=3):
             df = yf.download(ticker, start=start_date, end=end_date, progress=False)
             df.columns = df.columns.get_level_values(0)
             df = df.dropna(subset=['Close'])
-            if len(df) > 40:
+            if len(df) > lookback_days:
                 current = float(df['Close'].iloc[-1])
                 past = float(df['Close'].iloc[-lookback_days]) if len(df) > lookback_days else float(df['Close'].iloc[0])
                 if past > 0:
