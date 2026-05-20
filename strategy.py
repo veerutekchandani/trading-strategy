@@ -24,8 +24,8 @@ NIFTY_100 = [
     'SRF.NS','TATAPOWER.NS','TORNTPHARM.NS','TRENT.NS',
     'VEDL.NS','ZYDUSLIFE.NS','DABUR.NS',
     'PFC.NS','POLYCAB.NS','PERSISTENT.NS','PIIND.NS',
-    'MAXHEALTH.NS','JSWENERGY.NS','CUMMINSIND.NS','MAXHEALTH.NS','MANKIND.NS','JSWENERGY.NS','CUMMINSIND.NS',
-    'ETERNAL.NS','TVSMOTOR.NS','INDHOTEL.NS','LICI.NS','LTIM.NS','JIOFIN.NS','DMART.NS',
+    'MAXHEALTH.NS','MANKIND.NS','JSWENERGY.NS','CUMMINSIND.NS',
+    'ETERNAL.NS','TVSMOTOR.NS','INDHOTEL.NS','LICI.NS','LTIM.NS','JIOFIN.NS','DMART.NS'
 ]
 
 LOOKBACK_DAYS = 63
@@ -37,10 +37,11 @@ def is_skip_month():
     return datetime.now().month in SKIP_MONTHS
 
 
-def get_momentum_ranking():
-    """Calculate 3-month momentum for all Nifty 100 stocks."""
+def get_momentum_ranking(lookback_months=3):
+    """Calculate momentum for all Nifty 100 stocks."""
+    lookback_days = lookback_months * 21
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=LOOKBACK_DAYS * 2)
+    start_date = end_date - timedelta(days=lookback_days * 2)
 
     results = []
     for ticker in NIFTY_100:
@@ -50,7 +51,7 @@ def get_momentum_ranking():
             df = df.dropna(subset=['Close'])
             if len(df) > 40:
                 current = float(df['Close'].iloc[-1])
-                past = float(df['Close'].iloc[-63]) if len(df) > 63 else float(df['Close'].iloc[0])
+                past = float(df['Close'].iloc[-lookback_days]) if len(df) > lookback_days else float(df['Close'].iloc[0])
                 if past > 0:
                     momentum = ((current / past) - 1) * 100
                     results.append({
@@ -62,13 +63,15 @@ def get_momentum_ranking():
         except:
             pass
 
-    df = pd.DataFrame(results).sort_values('Momentum', ascending=False).reset_index(drop=True)
-    return df
+    df = pd.DataFrame(results)
+    if df.empty:
+        return pd.DataFrame(columns=['Stock', 'Ticker', 'Price', 'Momentum'])
+    return df.sort_values('Momentum', ascending=False).reset_index(drop=True)
 
 
-def get_top_picks(n=TOP_N):
+def get_top_picks(n=TOP_N, lookback_months=3):
     """Get top N momentum stocks."""
-    ranking = get_momentum_ranking()
+    ranking = get_momentum_ranking(lookback_months)
     return ranking.head(n)
 
 

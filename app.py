@@ -122,22 +122,32 @@ def show_trades():
 def show_momentum_ranking():
     st.header("🏆 Current Momentum Ranking")
 
-    if st.button("🔄 Refresh Rankings"):
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        lookback = st.selectbox("Lookback Period", [1, 2, 3, 4, 5, 6, 8, 10, 12], index=2, format_func=lambda x: f"{x} month{'s' if x > 1 else ''}")
+    with col_b:
+        top_n = st.number_input("Top N Stocks", min_value=1, max_value=15, value=5)
+    with col_c:
+        st.write("")
+        st.write("")
+        refresh = st.button("🔄 Refresh Rankings")
+
+    if refresh:
         st.cache_data.clear()
 
-    with st.spinner("Calculating momentum for 90+ stocks..."):
-        picks = get_top_picks(20)
+    with st.spinner(f"Calculating {lookback}-month momentum for 90+ stocks..."):
+        picks = get_top_picks(top_n * 3, lookback)
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
-        st.subheader("Top 5 (Buy These)")
-        for i, row in picks.head(5).iterrows():
+        st.subheader(f"Top {top_n} (Buy These)")
+        for i, row in picks.head(top_n).iterrows():
             st.success(f"**{i+1}. {row['Stock']}** — +{row['Momentum']:.1f}% | ₹{row['Price']:,.0f}")
 
     with col2:
-        fig = px.bar(picks.head(15), x='Stock', y='Momentum', color='Momentum',
-                     color_continuous_scale='RdYlGn', title='Top 15 Momentum Stocks')
+        fig = px.bar(picks.head(top_n * 2), x='Stock', y='Momentum', color='Momentum',
+                     color_continuous_scale='RdYlGn', title=f'Top {top_n * 2} Momentum Stocks ({lookback}m lookback)')
         st.plotly_chart(fig, use_container_width=True)
 
 
