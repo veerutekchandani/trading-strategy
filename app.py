@@ -373,7 +373,7 @@ def show_intraday():
 
     # Backtest Calendar
     st.divider()
-    st.subheader("📅 Backtest Calendar (Last 2 Months)")
+    st.subheader("📅 Trade History & Performance (2026)")
 
     import plotly.express as px
     if os.path.exists('backtest_calendar.json'):
@@ -381,36 +381,57 @@ def show_intraday():
             cal_data = json.load(f)
         cal_df = pd.DataFrame(cal_data)
         cal_df['date'] = pd.to_datetime(cal_df['date'])
-        cal_df['day'] = cal_df['date'].dt.strftime('%a')
-        cal_df['week'] = cal_df['date'].dt.isocalendar().week.astype(int)
-        cal_df['weekday_num'] = cal_df['date'].dt.weekday
 
         # Summary metrics
-        profit_days = len(cal_df[cal_df['pnl'] > 0])
-        loss_days = len(cal_df[cal_df['pnl'] < 0])
-        no_trade = len(cal_df[cal_df['pnl'] == 0])
+        traded = cal_df[cal_df['direction'] != '-']
+        profit_days = len(traded[traded['pnl'] > 0])
+        loss_days = len(traded[traded['pnl'] < 0])
+        no_trade = len(cal_df[cal_df['direction'] == '-'])
+        total_pnl = cal_df['pnl'].sum()
 
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("🟢 Profit Days", profit_days)
-        col2.metric("🔴 Loss Days", loss_days)
-        col3.metric("⚪ No Trade", no_trade)
-        col4.metric("💰 Total P&L", f"₹{cal_df['pnl'].sum():+,.0f}")
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("💰 Total P&L", f"₹{total_pnl:+,.0f}")
+        col2.metric("📊 Total Trades", len(traded))
+        col3.metric("🟢 Wins", profit_days)
+        col4.metric("🔴 Losses", loss_days)
+        col5.metric("📈 Win Rate", f"{profit_days/len(traded)*100:.0f}%" if len(traded) > 0 else "0%")
 
-        # Heatmap
-        cal_df['color'] = cal_df['pnl'].apply(lambda x: 'Profit' if x > 0 else ('Loss' if x < 0 else 'No Trade'))
-        cal_df['label'] = cal_df.apply(lambda r: f"{r['date'].strftime('%d %b')}\n₹{r['pnl']:+,.0f}\n{r['result']}", axis=1)
+        # Monthly P&L summary
+        cal_df['month'] = cal_df['date'].dt.strftime('%b %Y')
+        monthly = cal_df.groupby('month').agg(
+            trades=('direction', lambda x: sum(x != '-')),
+            pnl=('pnl', 'sum'),
+            wins=('pnl', lambda x: sum(x > 0))
+        ).reset_index()
 
-        fig = px.scatter(cal_df, x='week', y='weekday_num', color='pnl',
-                        color_continuous_scale='RdYlGn', color_continuous_midpoint=0,
-                        size=[20]*len(cal_df), hover_data=['date', 'pnl', 'result', 'direction'],
-                        title='Daily P&L Calendar (Green=Profit, Red=Loss)')
-        fig.update_yaxes(tickvals=[0,1,2,3,4], ticktext=['Mon','Tue','Wed','Thu','Fri'], autorange='reversed')
-        fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
+        st.subheader("📊 Monthly P&L")
+        fig_monthly = go.Figure(go.Bar(
+            x=monthly['month'], y=monthly['pnl'],
+            marker_color=['green' if p > 0 else 'red' for p in monthly['pnl']],
+            text=[f"₹{p:+,.0f}" for p in monthly['pnl']],
+            textposition='outside'
+        ))
+        fig_monthly.update_layout(height=300, yaxis_title="P&L (₹)", xaxis_title="")
+        st.plotly_chart(fig_monthly, use_container_width=True)
 
-        # Table view
-        st.dataframe(cal_df[['date','day','direction','pnl','result','range']].sort_values('date', ascending=False),
-                    use_container_width=True, hide_index=True)
+        # Equity curve
+        traded_only = cal_df[cal_df['pnl'] != 0].copy()
+        if not traded_only.empty:
+            traded_only['cumulative'] = ORB_CAPITAL + traded_only['pnl'].cumsum()
+            fig_eq = go.Figure()
+            fig_eq.add_trace(go.Scatter(x=traded_only['date'], y=traded_only['cumulative'],
+                                        mode='lines+markers', line=dict(color='#00d4aa', width=2),
+                                        fill='tozeroy', fillcolor='rgba(0,212,170,0.1)'))
+            fig_eq.add_hline(y=ORB_CAPITAL, line_dash="dash", line_color="gray", annotation_text=f"Capital ₹{ORB_CAPITAL:,.0f}")
+            fig_eq.update_layout(height=300, title="Equity Curve", yaxis_title="Portfolio (₹)")
+            st.plotly_chart(fig_eq, use_container_width=True)
+
+        # Trade history table
+        st.subheader("📜 All Trades")
+        display_df = cal_df[cal_df['direction'] != '-'][['date', 'direction', 'or_high', 'or_low', 'range', 'entry', 'exit', 'gross', 'charges', 'pnl', 'result']].copy()
+        display_df.columns = ['Date', 'Direction', 'OR High', 'OR Low', 'Range', 'Entry', 'Exit', 'Gross', 'Charges', 'Net P&L', 'Result']
+        display_df = display_df.sort_values('Date', ascending=False)
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
 # --- MAIN APP ---
