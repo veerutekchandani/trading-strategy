@@ -371,6 +371,47 @@ def show_intraday():
             col2.metric("Win Rate", f"{len(active[active['pnl']>0])}/{len(active)} ({len(active[active['pnl']>0])/len(active)*100:.0f}%)")
             col3.metric("Portfolio", f"₹{ORB_CAPITAL + active['pnl'].sum():,.0f}")
 
+    # Backtest Calendar
+    st.divider()
+    st.subheader("📅 Backtest Calendar (Last 2 Months)")
+
+    import plotly.express as px
+    if os.path.exists('backtest_calendar.json'):
+        with open('backtest_calendar.json') as f:
+            cal_data = json.load(f)
+        cal_df = pd.DataFrame(cal_data)
+        cal_df['date'] = pd.to_datetime(cal_df['date'])
+        cal_df['day'] = cal_df['date'].dt.strftime('%a')
+        cal_df['week'] = cal_df['date'].dt.isocalendar().week.astype(int)
+        cal_df['weekday_num'] = cal_df['date'].dt.weekday
+
+        # Summary metrics
+        profit_days = len(cal_df[cal_df['pnl'] > 0])
+        loss_days = len(cal_df[cal_df['pnl'] < 0])
+        no_trade = len(cal_df[cal_df['pnl'] == 0])
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("🟢 Profit Days", profit_days)
+        col2.metric("🔴 Loss Days", loss_days)
+        col3.metric("⚪ No Trade", no_trade)
+        col4.metric("💰 Total P&L", f"₹{cal_df['pnl'].sum():+,.0f}")
+
+        # Heatmap
+        cal_df['color'] = cal_df['pnl'].apply(lambda x: 'Profit' if x > 0 else ('Loss' if x < 0 else 'No Trade'))
+        cal_df['label'] = cal_df.apply(lambda r: f"{r['date'].strftime('%d %b')}\n₹{r['pnl']:+,.0f}\n{r['result']}", axis=1)
+
+        fig = px.scatter(cal_df, x='week', y='weekday_num', color='pnl',
+                        color_continuous_scale='RdYlGn', color_continuous_midpoint=0,
+                        size=[20]*len(cal_df), hover_data=['date', 'pnl', 'result', 'direction'],
+                        title='Daily P&L Calendar (Green=Profit, Red=Loss)')
+        fig.update_yaxes(tickvals=[0,1,2,3,4], ticktext=['Mon','Tue','Wed','Thu','Fri'], autorange='reversed')
+        fig.update_layout(height=300)
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Table view
+        st.dataframe(cal_df[['date','day','direction','pnl','result','range']].sort_values('date', ascending=False),
+                    use_container_width=True, hide_index=True)
+
 
 # --- MAIN APP ---
 import os

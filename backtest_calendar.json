@@ -1,0 +1,408 @@
+[
+  {
+    "date": "2026-02-19",
+    "pnl": 11656,
+    "result": "TARGET",
+    "direction": "SHORT",
+    "range": 129
+  },
+  {
+    "date": "2026-02-20",
+    "pnl": 2159,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 144
+  },
+  {
+    "date": "2026-02-23",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 144
+  },
+  {
+    "date": "2026-02-24",
+    "pnl": 3144,
+    "result": "EOD EXIT",
+    "direction": "SHORT",
+    "range": 158
+  },
+  {
+    "date": "2026-02-25",
+    "pnl": -8712,
+    "result": "SL HIT",
+    "direction": "LONG",
+    "range": 120
+  },
+  {
+    "date": "2026-02-26",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 84
+  },
+  {
+    "date": "2026-02-27",
+    "pnl": 8286,
+    "result": "EOD EXIT",
+    "direction": "SHORT",
+    "range": 161
+  },
+  {
+    "date": "2026-03-02",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 267
+  },
+  {
+    "date": "2026-03-04",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 165
+  },
+  {
+    "date": "2026-03-05",
+    "pnl": -9089,
+    "result": "SL HIT",
+    "direction": "LONG",
+    "range": 126
+  },
+  {
+    "date": "2026-03-06",
+    "pnl": 8814,
+    "result": "TARGET",
+    "direction": "SHORT",
+    "range": 100
+  },
+  {
+    "date": "2026-03-09",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 260
+  },
+  {
+    "date": "2026-03-10",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 217
+  },
+  {
+    "date": "2026-03-11",
+    "pnl": 15205,
+    "result": "EOD EXIT",
+    "direction": "SHORT",
+    "range": 189
+  },
+  {
+    "date": "2026-03-12",
+    "pnl": -4971,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 138
+  },
+  {
+    "date": "2026-03-13",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 180
+  },
+  {
+    "date": "2026-03-16",
+    "pnl": -12476,
+    "result": "SL HIT",
+    "direction": "SHORT",
+    "range": 178
+  },
+  {
+    "date": "2026-03-17",
+    "pnl": 3680,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 189
+  },
+  {
+    "date": "2026-03-18",
+    "pnl": 1571,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 124
+  },
+  {
+    "date": "2026-03-19",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 163
+  },
+  {
+    "date": "2026-03-20",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 188
+  },
+  {
+    "date": "2026-03-23",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 267
+  },
+  {
+    "date": "2026-03-24",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 215
+  },
+  {
+    "date": "2026-03-25",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 242
+  },
+  {
+    "date": "2026-03-27",
+    "pnl": 9641,
+    "result": "EOD EXIT",
+    "direction": "SHORT",
+    "range": 196
+  },
+  {
+    "date": "2026-03-30",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 240
+  },
+  {
+    "date": "2026-04-01",
+    "pnl": 8172,
+    "result": "EOD EXIT",
+    "direction": "SHORT",
+    "range": 130
+  },
+  {
+    "date": "2026-04-02",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 200
+  },
+  {
+    "date": "2026-04-06",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 223
+  },
+  {
+    "date": "2026-04-07",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 208
+  },
+  {
+    "date": "2026-04-08",
+    "pnl": 1369,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 123
+  },
+  {
+    "date": "2026-04-09",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 229
+  },
+  {
+    "date": "2026-04-10",
+    "pnl": 2744,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 134
+  },
+  {
+    "date": "2026-04-13",
+    "pnl": 12499,
+    "result": "TARGET",
+    "direction": "LONG",
+    "range": 138
+  },
+  {
+    "date": "2026-04-15",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 120
+  },
+  {
+    "date": "2026-04-16",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 134
+  },
+  {
+    "date": "2026-04-17",
+    "pnl": 3973,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 170
+  },
+  {
+    "date": "2026-04-21",
+    "pnl": 2231,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 168
+  },
+  {
+    "date": "2026-04-22",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 162
+  },
+  {
+    "date": "2026-04-23",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 171
+  },
+  {
+    "date": "2026-04-24",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 258
+  },
+  {
+    "date": "2026-04-27",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 155
+  },
+  {
+    "date": "2026-04-28",
+    "pnl": -11738,
+    "result": "SL HIT",
+    "direction": "LONG",
+    "range": 167
+  },
+  {
+    "date": "2026-04-29",
+    "pnl": -5182,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 175
+  },
+  {
+    "date": "2026-04-30",
+    "pnl": -12664,
+    "result": "SL HIT",
+    "direction": "SHORT",
+    "range": 181
+  },
+  {
+    "date": "2026-05-04",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 193
+  },
+  {
+    "date": "2026-05-05",
+    "pnl": -8735,
+    "result": "SL HIT",
+    "direction": "SHORT",
+    "range": 120
+  },
+  {
+    "date": "2026-05-06",
+    "pnl": -10584,
+    "result": "SL HIT",
+    "direction": "SHORT",
+    "range": 149
+  },
+  {
+    "date": "2026-05-07",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 118
+  },
+  {
+    "date": "2026-05-08",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 114
+  },
+  {
+    "date": "2026-05-11",
+    "pnl": -8156,
+    "result": "SL HIT",
+    "direction": "SHORT",
+    "range": 111
+  },
+  {
+    "date": "2026-05-12",
+    "pnl": 12753,
+    "result": "TARGET",
+    "direction": "SHORT",
+    "range": 140
+  },
+  {
+    "date": "2026-05-13",
+    "pnl": 0,
+    "result": "NO TRADE",
+    "direction": "-",
+    "range": 240
+  },
+  {
+    "date": "2026-05-14",
+    "pnl": -10122,
+    "result": "SL HIT",
+    "direction": "SHORT",
+    "range": 142
+  },
+  {
+    "date": "2026-05-15",
+    "pnl": 0,
+    "result": "NO BREAKOUT",
+    "direction": "-",
+    "range": 173
+  },
+  {
+    "date": "2026-05-18",
+    "pnl": 8760,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 168
+  },
+  {
+    "date": "2026-05-19",
+    "pnl": -8748,
+    "result": "SL HIT",
+    "direction": "LONG",
+    "range": 121
+  },
+  {
+    "date": "2026-05-20",
+    "pnl": 6839,
+    "result": "EOD EXIT",
+    "direction": "LONG",
+    "range": 145
+  }
+]
