@@ -25,7 +25,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # --- CONFIG ---
-SHEET_NAME = "momentum-strategy-trading"
+SHEET_NAME = "Momentum Strategy"
 TAB_NAME = "Intraday"
 LOT_SIZE = 65
 MIN_RANGE = 50
