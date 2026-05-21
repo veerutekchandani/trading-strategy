@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import yfinance as yf
 from datetime import datetime
+import os, json
 from strategy import get_top_picks, get_live_price, is_skip_month, SKIP_MONTHS
 import sheets
 
@@ -170,7 +172,7 @@ def do_rebalance():
             st.success(f"✅ All sold. Cash: ₹{cash:,.0f}")
         return
 
-    st.info("This will sell current holdings and buy the new top 5 momentum stocks.")
+    st.info("This will sell stocks that dropped out of top 5 and buy new entries. Stocks still in top 5 are kept.")
 
     if st.button("⚡ Execute Rebalance", type="primary"):
         with st.spinner("Calculating picks and executing trades..."):
@@ -179,61 +181,214 @@ def do_rebalance():
             cash = sheets.get_cash()
             today = datetime.now().strftime('%Y-%m-%d')
 
-            # Sell current holdings
+            new_top5 = picks['Stock'].tolist()
+            current_stocks = holdings['Stock'].tolist() if not holdings.empty else []
+
+            # Determine what to sell and buy
+            to_sell = [s for s in current_stocks if s not in new_top5]
+            to_buy = [s for s in new_top5 if s not in current_stocks]
+            to_keep = [s for s in current_stocks if s in new_top5]
+
+            st.write(f"**Keep:** {', '.join(to_keep) if to_keep else 'None'}")
+            st.write(f"**Sell:** {', '.join(to_sell) if to_sell else 'None'}")
+            st.write(f"**Buy:** {', '.join(to_buy) if to_buy else 'None'}")
+
+            # Sell stocks that dropped out
+            kept_holdings = []
             if not holdings.empty:
                 for _, row in holdings.iterrows():
-                    price = get_live_price(row['Stock'] + '.NS') or float(row['Buy Price'])
-                    qty = int(row['Qty'])
-                    proceeds = qty * price
-                    pnl = proceeds - (qty * float(row['Buy Price']))
-                    cash += proceeds
-                    sheets.add_trade(today, 'SELL', row['Stock'], qty, round(price, 2),
-                                   round(proceeds, 2), round(pnl, 2))
+                    if row['Stock'] in to_sell:
+                        price = get_live_price(row['Stock'] + '.NS') or float(row['Buy Price'])
+                        qty = int(row['Qty'])
+                        proceeds = qty * price
+                        pnl = proceeds - (qty * float(row['Buy Price']))
+                        cash += proceeds
+                        sheets.add_trade(today, 'SELL', row['Stock'], qty, round(price, 2),
+                                       round(proceeds, 2), round(pnl, 2))
+                    else:
+                        kept_holdings.append(row.to_dict())
 
-            # Buy new picks
-            amount_per_stock = cash / 5
-            new_holdings = []
-            for _, row in picks.iterrows():
-                qty = int(amount_per_stock / row['Price'])
-                if qty > 0:
-                    cost = qty * row['Price']
-                    cash -= cost
-                    new_holdings.append({
-                        'Stock': row['Stock'], 'Qty': qty,
-                        'Buy Price': round(row['Price'], 2),
-                        'Buy Date': today, 'Current Price': round(row['Price'], 2), 'P&L %': 0
-                    })
-                    sheets.add_trade(today, 'BUY', row['Stock'], qty,
-                                   round(row['Price'], 2), round(cost, 2), '')
+            # Buy new entries (split cash equally among new buys only)
+            if to_buy:
+                amount_per_stock = cash / len(to_buy)
+                for _, row in picks.iterrows():
+                    if row['Stock'] in to_buy:
+                        qty = int(amount_per_stock / row['Price'])
+                        if qty > 0:
+                            cost = qty * row['Price']
+                            cash -= cost
+                            kept_holdings.append({
+                                'Stock': row['Stock'], 'Qty': qty,
+                                'Buy Price': round(row['Price'], 2),
+                                'Buy Date': today, 'Current Price': round(row['Price'], 2), 'P&L %': 0
+                            })
+                            sheets.add_trade(today, 'BUY', row['Stock'], qty,
+                                           round(row['Price'], 2), round(cost, 2), '')
 
-            sheets.set_holdings(pd.DataFrame(new_holdings))
+            sheets.set_holdings(pd.DataFrame(kept_holdings))
             sheets.set_cash(cash)
 
             # Record monthly
-            total_value = cash + sum(r['Qty'] * r['Buy Price'] for r in new_holdings)
+            total_value = cash + sum(h['Qty'] * float(h['Buy Price']) for h in kept_holdings)
             ret_pct = (total_value / 100000 - 1) * 100
-            stocks_str = ', '.join(r['Stock'] for r in new_holdings)
+            stocks_str = ', '.join(h['Stock'] for h in kept_holdings)
             sheets.add_monthly_record(datetime.now().strftime('%b %Y'), round(total_value, 0),
                                      round(ret_pct, 1), stocks_str)
 
-            st.success("✅ Rebalance complete!")
+            if not to_sell and not to_buy:
+                st.success("✅ No changes needed — same stocks remain in top 5!")
+            else:
+                st.success(f"✅ Rebalance complete! Sold {len(to_sell)}, Bought {len(to_buy)}, Kept {len(to_keep)}")
             st.balloons()
 
 
+# --- INTRADAY ORB FUNCTIONS ---
+def show_intraday():
+    import plotly.graph_objects as go
+    import json
+
+    ORB_LOT = 65
+    ORB_CAPITAL = 175000
+    ORB_MIN_RANGE = 50
+    ORB_MAX_RANGE = 200
+    ORB_TARGET_MULT = 1.5
+    ORB_TRADE_FILE = 'orb_trades.json'
+
+    def load_orb_trades():
+        if os.path.exists(ORB_TRADE_FILE):
+            with open(ORB_TRADE_FILE) as f:
+                return json.load(f)
+        return []
+
+    def save_orb_trades(trades):
+        with open(ORB_TRADE_FILE, 'w') as f:
+            json.dump(trades, f, indent=2)
+
+    @st.cache_data(ttl=60)
+    def get_nifty_today():
+        df = yf.download('^NSEI', period='5d', interval='5m', progress=False)
+        df.columns = df.columns.get_level_values(0)
+        df = df.dropna()
+        today = df.index[-1].date()
+        return df[df.index.date == today], df
+
+    st.title("⚡ Intraday ORB — Live Paper Trading")
+    st.caption("Nifty Futures | Lot: 65 | Capital: ₹1,75,000")
+
+    today_data, all_data = get_nifty_today()
+
+    if len(today_data) < 6:
+        st.warning("⏳ Market is closed or hasn't completed 30 minutes yet. Showing last trading day's data.")
+        # Show last complete trading day
+        all_data_copy = all_data.copy()
+        all_data_copy['date'] = all_data_copy.index.date
+        dates = sorted(all_data_copy['date'].unique())
+        for d in reversed(dates):
+            day = all_data_copy[all_data_copy['date'] == d]
+            if len(day) >= 6:
+                today_data = day
+                st.info(f"📅 Showing data for: **{d}**")
+                break
+
+    if len(today_data) < 6:
+        st.error("No data available.")
+        return
+
+    first_30 = today_data.iloc[:6]
+    orb_high = float(first_30['High'].max())
+    orb_low = float(first_30['Low'].min())
+    orb_range = orb_high - orb_low
+    current_price = float(today_data['Close'].iloc[-1])
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Nifty Now", f"{current_price:,.1f}")
+    col2.metric("OR High", f"{orb_high:,.1f}")
+    col3.metric("OR Low", f"{orb_low:,.1f}")
+    col4.metric("Range", f"{orb_range:,.0f} pts")
+
+    st.divider()
+
+    if orb_range < ORB_MIN_RANGE:
+        st.error(f"❌ NO TRADE — Range too tight ({orb_range:.0f} < {ORB_MIN_RANGE})")
+    elif orb_range > ORB_MAX_RANGE:
+        st.error(f"❌ NO TRADE — Range too wide ({orb_range:.0f} > {ORB_MAX_RANGE})")
+    else:
+        target_long = orb_high + orb_range * ORB_TARGET_MULT
+        target_short = orb_low - orb_range * ORB_TARGET_MULT
+        risk = orb_range * ORB_LOT
+        reward = orb_range * ORB_TARGET_MULT * ORB_LOT
+
+        if current_price > orb_high:
+            st.success(f"### 🟢 BUY SIGNAL — Entry: {orb_high:.1f} | SL: {orb_low:.1f} | Target: {target_long:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
+        elif current_price < orb_low:
+            st.error(f"### 🔴 SHORT SIGNAL — Entry: {orb_low:.1f} | SL: {orb_high:.1f} | Target: {target_short:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
+        else:
+            st.info(f"### ⏳ WAITING — BUY above {orb_high:.1f} | SHORT below {orb_low:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
+
+        # Chart
+        fig = go.Figure()
+        fig.add_trace(go.Candlestick(x=today_data.index, open=today_data['Open'],
+                                      high=today_data['High'], low=today_data['Low'],
+                                      close=today_data['Close'], name='Nifty'))
+        fig.add_hline(y=orb_high, line_dash="dash", line_color="green", annotation_text=f"OR High: {orb_high:.0f}")
+        fig.add_hline(y=orb_low, line_dash="dash", line_color="red", annotation_text=f"OR Low: {orb_low:.0f}")
+        fig.update_layout(height=400, xaxis_rangeslider_visible=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Log trade
+    st.divider()
+    st.subheader("📝 Log Trade")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        direction = st.selectbox("Direction", ["LONG", "SHORT", "NO TRADE"])
+    with col2:
+        entry_p = st.number_input("Entry", value=int(orb_high) if orb_high else 0)
+    with col3:
+        exit_p = st.number_input("Exit", value=0)
+    with col4:
+        result = st.selectbox("Result", ["TARGET", "SL HIT", "EOD EXIT"])
+
+    if st.button("💾 Save Trade"):
+        if direction != "NO TRADE" and exit_p > 0:
+            pnl = ((exit_p - entry_p) if direction == "LONG" else (entry_p - exit_p)) * ORB_LOT - 400
+            trades = load_orb_trades()
+            trades.append({'date': datetime.now().strftime('%Y-%m-%d'), 'direction': direction,
+                          'entry': entry_p, 'exit': exit_p, 'pnl': round(pnl), 'result': result})
+            save_orb_trades(trades)
+            st.success(f"✅ Saved! P&L: ₹{pnl:+,.0f}")
+
+    # History
+    trades = load_orb_trades()
+    if trades:
+        st.divider()
+        st.subheader("📜 Trade History")
+        tdf = pd.DataFrame(trades)
+        st.dataframe(tdf, use_container_width=True, hide_index=True)
+        active = tdf[tdf['direction'] != 'NO TRADE']
+        if not active.empty:
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total P&L", f"₹{active['pnl'].sum():+,.0f}")
+            col2.metric("Win Rate", f"{len(active[active['pnl']>0])}/{len(active)} ({len(active[active['pnl']>0])/len(active)*100:.0f}%)")
+            col3.metric("Portfolio", f"₹{ORB_CAPITAL + active['pnl'].sum():,.0f}")
+
+
 # --- MAIN APP ---
-show_header()
+import os
 
-tab1, tab2, tab3, tab4 = st.tabs(["💼 Portfolio", "📊 Performance", "🏆 Rankings", "🔄 Rebalance"])
+st.sidebar.title("📱 Strategy")
+page = st.sidebar.radio("Select", ["📈 Monthly Momentum", "⚡ Intraday ORB"])
 
-with tab1:
-    show_portfolio()
-    show_trades()
-
-with tab2:
-    show_monthly_chart()
-
-with tab3:
-    show_momentum_ranking()
-
-with tab4:
-    do_rebalance()
+if page == "📈 Monthly Momentum":
+    show_header()
+    tab1, tab2, tab3, tab4 = st.tabs(["💼 Portfolio", "📊 Performance", "🏆 Rankings", "🔄 Rebalance"])
+    with tab1:
+        show_portfolio()
+        show_trades()
+    with tab2:
+        show_monthly_chart()
+    with tab3:
+        show_momentum_ranking()
+    with tab4:
+        do_rebalance()
+else:
+    show_intraday()
