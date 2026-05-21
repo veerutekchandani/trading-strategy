@@ -95,3 +95,12 @@ def get_monthly():
     ws = get_sheet().worksheet("Monthly")
     records = ws.get_all_records()
     return pd.DataFrame(records) if records else pd.DataFrame(columns=['Month', 'Portfolio Value', 'Return %', 'Stocks Held'])
+
+
+def get_starting_capital():
+    ws = get_sheet().worksheet("Config")
+    records = ws.get_all_records()
+    for r in records:
+        if r['Key'] == 'starting_capital':
+            return float(r['Value'])
+    return 200000  # default

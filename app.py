@@ -66,7 +66,8 @@ def show_portfolio():
 
     total_portfolio = cash + total_current
     total_pnl = total_current - total_invested
-    overall_return = (total_portfolio / 100000 - 1) * 100
+    starting_cap = sheets.get_starting_capital()
+    overall_return = (total_portfolio / starting_cap - 1) * 100
 
     # Metrics row
     col1, col2, col3, col4 = st.columns(4)
@@ -97,7 +98,8 @@ def show_monthly_chart():
         line=dict(color='#00d4aa', width=3),
         fill='tozeroy', fillcolor='rgba(0,212,170,0.1)'
     ))
-    fig.add_hline(y=100000, line_dash="dash", line_color="gray", annotation_text="Starting Capital ₹1L")
+    starting_cap_val = sheets.get_starting_capital()
+    fig.add_hline(y=starting_cap_val, line_dash="dash", line_color="gray", annotation_text=f"Starting Capital ₹{starting_cap_val/100000:.0f}L")
     fig.update_layout(title="Portfolio Growth", yaxis_title="Value (₹)", xaxis_title="Month")
     st.plotly_chart(fig, use_container_width=True)
 
@@ -243,7 +245,7 @@ def do_rebalance():
 
             # Record monthly
             total_value = cash + sum(h['Qty'] * float(h['Buy Price']) for h in kept_holdings)
-            ret_pct = (total_value / 100000 - 1) * 100
+            ret_pct = (total_value / sheets.get_starting_capital() - 1) * 100
             stocks_str = ', '.join(h['Stock'] for h in kept_holdings)
             sheets.add_monthly_record(datetime.now().strftime('%b %Y'), round(total_value, 0),
                                      round(ret_pct, 1), stocks_str)
