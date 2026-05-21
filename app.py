@@ -275,6 +275,37 @@ def show_intraday():
     st.title("⚡ Intraday ORB — Live Paper Trading")
     st.caption("Nifty Futures | Lot: 65 | Capital: ₹1,75,000")
 
+    # Show live trade status from Google Sheets
+    try:
+        import sheets as sh
+        intraday_ws = sh.get_sheet().worksheet("Intraday")
+        all_rows = intraday_ws.get_all_records()
+        if all_rows:
+            last_row = all_rows[-1]
+            status = last_row.get('Status', '')
+            if status == 'IN TRADE':
+                st.error(f"""
+                ### 🔴 LIVE TRADE IN PROGRESS
+                **Date:** {last_row['Date']} | **Direction:** {last_row['Signal']} | **Entry:** {last_row['Entry']}  
+                **SL:** {last_row['SL']} | **Target:** {last_row['Target']}  
+                Waiting for SL/Target/EOD exit...
+                """)
+            elif status == 'WATCHING':
+                st.warning(f"""
+                ### ⏳ WATCHING FOR BREAKOUT
+                **Date:** {last_row['Date']} | **OR High:** {last_row['OR High']} | **OR Low:** {last_row['OR Low']} | **Range:** {last_row['Range']}
+                """)
+            elif status == 'CLOSED' and last_row.get('Signal'):
+                pnl = last_row.get('Net P&L', 0)
+                emoji = '🟢' if float(pnl) > 0 else '🔴' if float(pnl) < 0 else '⚪'
+                st.info(f"""
+                ### {emoji} Last Trade: {last_row['Result']}
+                **Date:** {last_row['Date']} | **Direction:** {last_row['Signal']} | **Entry:** {last_row['Entry']} → **Exit:** {last_row['Exit']}  
+                **Net P&L:** ₹{float(pnl):+,.0f} | **Charges:** ₹{last_row.get('Charges', 912)}
+                """)
+    except:
+        pass
+
     today_data, all_data = get_nifty_today()
 
     if len(today_data) < 6:
