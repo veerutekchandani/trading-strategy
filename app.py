@@ -193,6 +193,15 @@ def do_rebalance():
             st.write(f"**Sell:** {', '.join(to_sell) if to_sell else 'None'}")
             st.write(f"**Buy:** {', '.join(to_buy) if to_buy else 'None'}")
 
+            # Zerodha Delivery Charges per trade (buy or sell):
+            # STT: 0.1% on both buy & sell
+            # Stamp: 0.015% on buy
+            # Transaction: 0.00307% both sides
+            # GST: 18% on transaction
+            # SEBI: ₹10/crore
+            # Total ≈ 0.11% on buy, 0.11% on sell
+            DELIVERY_CHARGE_PCT = 0.0011  # 0.11% per side
+
             # Sell stocks that dropped out
             kept_holdings = []
             if not holdings.empty:
@@ -201,6 +210,8 @@ def do_rebalance():
                         price = get_live_price(row['Stock'] + '.NS') or float(row['Buy Price'])
                         qty = int(row['Qty'])
                         proceeds = qty * price
+                        sell_charges = round(proceeds * DELIVERY_CHARGE_PCT, 2)
+                        proceeds -= sell_charges
                         pnl = proceeds - (qty * float(row['Buy Price']))
                         cash += proceeds
                         sheets.add_trade(today, 'SELL', row['Stock'], qty, round(price, 2),
@@ -216,6 +227,8 @@ def do_rebalance():
                         qty = int(amount_per_stock / row['Price'])
                         if qty > 0:
                             cost = qty * row['Price']
+                            buy_charges = round(cost * DELIVERY_CHARGE_PCT, 2)
+                            cost += buy_charges
                             cash -= cost
                             kept_holdings.append({
                                 'Stock': row['Stock'], 'Qty': qty,
@@ -223,7 +236,7 @@ def do_rebalance():
                                 'Buy Date': today, 'Current Price': round(row['Price'], 2), 'P&L %': 0
                             })
                             sheets.add_trade(today, 'BUY', row['Stock'], qty,
-                                           round(row['Price'], 2), round(cost, 2), '')
+                                           round(row['Price'], 2), round(cost, 2), f'-{buy_charges}')
 
             sheets.set_holdings(pd.DataFrame(kept_holdings))
             sheets.set_cash(cash)
