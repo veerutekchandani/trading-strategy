@@ -180,7 +180,7 @@ def run():
                 sl = orb_low
                 target = entry + orb_range * TARGET_MULT
                 ws.update(f'E{row_num}:H{row_num}', [['LONG', round(entry, 1), round(sl, 1), round(target, 1)]])
-                ws.update(f'O{row_num}', [['IN TRADE']])
+                ws.update(f'N{row_num}', [['IN TRADE']])
 
                 send_telegram(f"🟢 <b>BUY SIGNAL — ENTRY!</b>\n\n"
                              
@@ -200,7 +200,7 @@ def run():
                 sl = orb_high
                 target = entry - orb_range * TARGET_MULT
                 ws.update(f'E{row_num}:H{row_num}', [['SHORT', round(entry, 1), round(sl, 1), round(target, 1)]])
-                ws.update(f'O{row_num}', [['IN TRADE']])
+                ws.update(f'N{row_num}', [['IN TRADE']])
 
                 send_telegram(f"🔴 <b>SHORT SIGNAL — ENTRY!</b>\n\n"
                              
@@ -218,7 +218,7 @@ def run():
         now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
         if now_ist.hour >= 15 and now_ist.minute >= 15:
             ws.update(f'E{row_num}', [['NO BREAKOUT']])
-            ws.update(f'J{row_num}:P{row_num}', [[0, 0, 0, 'NO BREAKOUT', 'CLOSED']])
+            ws.update(f'J{row_num}:N{row_num}', [[0, 0, 0, 'NO BREAKOUT', 'CLOSED']])
             send_telegram("⏰ <b>Market closing — No breakout today.</b> No trade taken.")
             print("No breakout by 3:15 PM. Day closed.")
 
@@ -242,14 +242,14 @@ def run():
             if signal == 'LONG':
                 if float(candle['Low']) <= sl:
                     pnl = calc_pnl(sl - entry)[0]
-                    ws.update(f'I{row_num}:P{row_num}', [[round(sl, 1), '', get_charges(), round(pnl), 'SL HIT', 'CLOSED']])
+                    ws.update(f'I{row_num}:N{row_num}', [[round(sl, 1), '', CHARGES, round(pnl), 'SL HIT', 'CLOSED']])
                     send_telegram(f"🔴 <b>STOP LOSS HIT</b>\n\n"
                                  f"Exit: {sl:.1f}\nP&L: ₹{pnl:+,.0f}\nResult: SL HIT")
                     print(f"SL hit. P&L: ₹{pnl:+,.0f}")
                     return
                 if float(candle['High']) >= target:
                     pnl = calc_pnl(target - entry)[0]
-                    ws.update(f'I{row_num}:P{row_num}', [[round(target, 1), '', get_charges(), round(pnl), 'TARGET', 'CLOSED']])
+                    ws.update(f'I{row_num}:N{row_num}', [[round(target, 1), '', CHARGES, round(pnl), 'TARGET', 'CLOSED']])
                     send_telegram(f"🟢 <b>TARGET HIT!</b> 🎉\n\n"
                                  f"Exit: {target:.1f}\nP&L: ₹{pnl:+,.0f}\nResult: TARGET HIT")
                     print(f"Target hit! P&L: ₹{pnl:+,.0f}")
@@ -257,14 +257,14 @@ def run():
             else:  # SHORT
                 if float(candle['High']) >= sl:
                     pnl = calc_pnl(entry - sl)[0]
-                    ws.update(f'I{row_num}:P{row_num}', [[round(sl, 1), '', get_charges(), round(pnl), 'SL HIT', 'CLOSED']])
+                    ws.update(f'I{row_num}:N{row_num}', [[round(sl, 1), '', CHARGES, round(pnl), 'SL HIT', 'CLOSED']])
                     send_telegram(f"🔴 <b>STOP LOSS HIT</b>\n\n"
                                  f"Exit: {sl:.1f}\nP&L: ₹{pnl:+,.0f}\nResult: SL HIT")
                     print(f"SL hit. P&L: ₹{pnl:+,.0f}")
                     return
                 if float(candle['Low']) <= target:
                     pnl = calc_pnl(entry - target)[0]
-                    ws.update(f'I{row_num}:P{row_num}', [[round(target, 1), '', get_charges(), round(pnl), 'TARGET', 'CLOSED']])
+                    ws.update(f'I{row_num}:N{row_num}', [[round(target, 1), '', CHARGES, round(pnl), 'TARGET', 'CLOSED']])
                     send_telegram(f"🟢 <b>TARGET HIT!</b> 🎉\n\n"
                                  f"Exit: {target:.1f}\nP&L: ₹{pnl:+,.0f}\nResult: TARGET HIT")
                     print(f"Target hit! P&L: ₹{pnl:+,.0f}")
@@ -279,7 +279,7 @@ def run():
                     pnl = calc_pnl(current - entry)[0]
                 else:
                     pnl = calc_pnl(entry - current)[0]
-                ws.update(f'I{row_num}:P{row_num}', [[round(current, 1), '', get_charges(), round(pnl), 'EOD EXIT', 'CLOSED']])
+                ws.update(f'I{row_num}:N{row_num}', [[round(current, 1), '', CHARGES, round(pnl), 'EOD EXIT', 'CLOSED']])
                 send_telegram(f"⏰ <b>EOD EXIT</b> (3:15 PM)\n\n"
                              f"Exit: {current:.1f}\nP&L: ₹{pnl:+,.0f}\nResult: EOD EXIT")
                 print(f"EOD exit at {current:.1f}. P&L: ₹{pnl:+,.0f}")
