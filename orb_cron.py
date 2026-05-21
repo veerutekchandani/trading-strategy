@@ -31,6 +31,7 @@ LOT_SIZE = 65
 MIN_RANGE = 50
 MAX_RANGE = 250
 TARGET_MULT = 1.5
+SL_MULT = 0.5
 
 # Zerodha F&O Futures charges per trade
 CHARGES = 912  # STT ₹764 + Brokerage ₹40 + Transaction ₹56 + GST ₹18 + Stamp ₹31 + SEBI ₹3
@@ -149,7 +150,7 @@ def run():
                      f"Range: {orb_range:.0f} pts\n\n"
                      f"🟢 BUY above {orb_high:.1f} → Target {target_long:.1f}\n"
                      f"🔴 SHORT below {orb_low:.1f} → Target {target_short:.1f}\n"
-                     f"💰 Risk: ₹{orb_range * LOT_SIZE:,.0f} | Reward: ₹{orb_range * TARGET_MULT * LOT_SIZE:,.0f}")
+                     f"💰 Risk: ₹{orb_range * SL_MULT * LOT_SIZE:,.0f} | Reward: ₹{orb_range * TARGET_MULT * LOT_SIZE:,.0f}")
         print(f"ORB set: High={orb_high:.1f}, Low={orb_low:.1f}, Range={orb_range:.0f}")
         return
 
@@ -177,7 +178,7 @@ def run():
             if float(candle['Close']) > orb_high:
                 # LONG breakout
                 entry = orb_high
-                sl = orb_low
+                sl = entry - orb_range * SL_MULT
                 target = entry + orb_range * TARGET_MULT
                 ws.update(f'E{row_num}:H{row_num}', [['LONG', round(entry, 1), round(sl, 1), round(target, 1)]])
                 ws.update(f'N{row_num}', [['IN TRADE']])
@@ -197,7 +198,7 @@ def run():
             elif float(candle['Close']) < orb_low:
                 # SHORT breakout
                 entry = orb_low
-                sl = orb_high
+                sl = entry + orb_range * SL_MULT
                 target = entry - orb_range * TARGET_MULT
                 ws.update(f'E{row_num}:H{row_num}', [['SHORT', round(entry, 1), round(sl, 1), round(target, 1)]])
                 ws.update(f'N{row_num}', [['IN TRADE']])
