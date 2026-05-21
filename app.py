@@ -359,13 +359,15 @@ def show_intraday():
     else:
         target_long = orb_high + orb_range * ORB_TARGET_MULT
         target_short = orb_low - orb_range * ORB_TARGET_MULT
-        risk = orb_range * ORB_LOT
+        sl_long = orb_high - orb_range * 0.5
+        sl_short = orb_low + orb_range * 0.5
+        risk = orb_range * 0.5 * ORB_LOT
         reward = orb_range * ORB_TARGET_MULT * ORB_LOT
 
         if current_price > orb_high:
-            st.success(f"### 🟢 BUY SIGNAL — Entry: {orb_high:.1f} | SL: {orb_low:.1f} | Target: {target_long:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
+            st.success(f"### 🟢 BUY SIGNAL — Entry: {orb_high:.1f} | SL: {sl_long:.1f} | Target: {target_long:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
         elif current_price < orb_low:
-            st.error(f"### 🔴 SHORT SIGNAL — Entry: {orb_low:.1f} | SL: {orb_high:.1f} | Target: {target_short:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
+            st.error(f"### 🔴 SHORT SIGNAL — Entry: {orb_low:.1f} | SL: {sl_short:.1f} | Target: {target_short:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
         else:
             st.info(f"### ⏳ WAITING — BUY above {orb_high:.1f} | SHORT below {orb_low:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
 
