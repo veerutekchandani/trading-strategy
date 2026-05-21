@@ -422,11 +422,23 @@ def show_intraday():
     st.subheader("📅 Trade History & Performance (2026)")
 
     import plotly.express as px
-    if os.path.exists('backtest_calendar.json'):
-        with open('backtest_calendar.json') as f:
-            cal_data = json.load(f)
-        cal_df = pd.DataFrame(cal_data)
-        cal_df['date'] = pd.to_datetime(cal_df['date'])
+    try:
+        import sheets as sh
+        intraday_ws = sh.get_sheet().worksheet("Intraday")
+        all_records = intraday_ws.get_all_records()
+        if all_records:
+            cal_df = pd.DataFrame(all_records)
+            cal_df['date'] = pd.to_datetime(cal_df['Date'])
+            cal_df['pnl'] = pd.to_numeric(cal_df['Net P&L'], errors='coerce').fillna(0)
+            cal_df['direction'] = cal_df['Signal'].fillna('-').replace('', '-')
+            cal_df['result'] = cal_df['Result'].fillna('')
+            cal_df['range'] = pd.to_numeric(cal_df['Range'], errors='coerce').fillna(0)
+            cal_df['or_high'] = cal_df['OR High']
+            cal_df['or_low'] = cal_df['OR Low']
+            cal_df['entry'] = cal_df['Entry']
+            cal_df['exit'] = cal_df['Exit']
+            cal_df['gross'] = pd.to_numeric(cal_df['Gross P&L'], errors='coerce').fillna(0)
+            cal_df['charges'] = pd.to_numeric(cal_df['Charges'], errors='coerce').fillna(0)
 
         # Summary metrics
         traded = cal_df[cal_df['direction'] != '-']
@@ -478,6 +490,8 @@ def show_intraday():
         display_df.columns = ['Date', 'Direction', 'OR High', 'OR Low', 'Range', 'Entry', 'Exit', 'Gross', 'Charges', 'Net P&L', 'Result']
         display_df = display_df.sort_values('Date', ascending=False)
         st.dataframe(display_df, use_container_width=True, hide_index=True)
+    except Exception as e:
+        st.warning(f"Could not load intraday data from Google Sheet: {e}")
 
 
 # --- MAIN APP ---
