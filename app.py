@@ -323,7 +323,7 @@ def show_intraday():
 
     today_data, all_data = get_nifty_today()
 
-    if len(today_data) < 6:
+    if len(today_data) < 12:
         st.warning("⏳ Market is closed or hasn't completed 30 minutes yet. Showing last trading day's data.")
         # Show last complete trading day
         all_data_copy = all_data.copy()
@@ -336,11 +336,11 @@ def show_intraday():
                 st.info(f"📅 Showing data for: **{d}**")
                 break
 
-    if len(today_data) < 6:
+    if len(today_data) < 12:
         st.error("No data available.")
         return
 
-    first_30 = today_data.iloc[:6]
+    first_30 = today_data.iloc[:12]  # First hour = 12 candles of 5-min
     orb_high = float(first_30['High'].max())
     orb_low = float(first_30['Low'].min())
     orb_range = orb_high - orb_low
