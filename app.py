@@ -500,7 +500,7 @@ def show_intraday():
 import os
 
 st.sidebar.title("📱 Strategy")
-page = st.sidebar.radio("Select", ["📈 Monthly Momentum", "⚡ Intraday ORB"])
+page = st.sidebar.radio("Select", ["📈 Monthly Momentum", "⚡ Intraday ORB", "🚀 Gap & Go"])
 
 if page == "📈 Monthly Momentum":
     show_header()
@@ -514,5 +514,105 @@ if page == "📈 Monthly Momentum":
         show_momentum_ranking()
     with tab4:
         do_rebalance()
-else:
+elif page == "⚡ Intraday ORB":
     show_intraday()
+else:
+    # Gap & Go page
+    st.title("🚀 Gap & Go — Live Paper Trading")
+    st.caption("Top 1 Stock | Gap >1% | Entry +0.5% | SL 0.5% | Target 1.5% | Exit 11:15 AM")
+
+    # Live trade status from Google Sheet
+    try:
+        import sheets as sh
+        gap_ws = sh.get_sheet().worksheet("Gap Go")
+        gap_records = gap_ws.get_all_records()
+        if gap_records:
+            last = gap_records[-1]
+            status = last.get('Status', '')
+            if status == 'IN TRADE':
+                st.error(f"""
+                ### 🔴 LIVE TRADE IN PROGRESS
+                **Date:** {last['Date']} | **Stock:** {last['Stock']} | **Direction:** {last['Signal']}  
+                **Entry:** {last['Entry']} | **SL:** {last['SL']} | **Target:** {last['Target']}
+                """)
+            elif status == 'ALERT SENT':
+                st.warning(f"""
+                ### ⏳ ALERT SENT — WAITING FOR ENTRY
+                **Date:** {last['Date']} | **Stock:** {last['Stock']} | **Gap:** {last['Gap%']}%
+                """)
+            elif status == 'CLOSED' and last.get('Signal'):
+                pnl = last.get('Net P&L', 0)
+                try:
+                    pnl_val = float(pnl)
+                except:
+                    pnl_val = 0
+                emoji = '🟢' if pnl_val > 0 else '🔴' if pnl_val < 0 else '⚪'
+                st.info(f"""
+                ### {emoji} Last Trade: {last['Result']}
+                **Date:** {last['Date']} | **Stock:** {last['Stock']} | **{last['Signal']}**  
+                **Entry:** {last['Entry']} → **Exit:** {last['Exit']} | **Net P&L:** ₹{pnl_val:+,.0f}
+                """)
+    except:
+        pass
+
+    # Trade history from Google Sheet
+    st.divider()
+    st.subheader("📅 Trade History & Performance")
+
+    try:
+        import sheets as sh
+        gap_ws = sh.get_sheet().worksheet("Gap Go")
+        all_records = gap_ws.get_all_records()
+        if all_records:
+            cal_df = pd.DataFrame(all_records)
+            cal_df['date'] = pd.to_datetime(cal_df['Date'])
+            cal_df['pnl'] = pd.to_numeric(cal_df['Net P&L'], errors='coerce').fillna(0)
+            cal_df['direction'] = cal_df['Signal'].fillna('-').replace('', '-')
+
+            traded = cal_df[cal_df['direction'].isin(['LONG', 'SHORT'])]
+            traded = traded[traded['Result'].isin(['TARGET', 'SL HIT', 'EOD EXIT'])]
+
+            if not traded.empty:
+                profit_days = len(traded[traded['pnl'] > 0])
+                loss_days = len(traded[traded['pnl'] < 0])
+                total_pnl = traded['pnl'].sum()
+
+                col1, col2, col3, col4, col5 = st.columns(5)
+                col1.metric("💰 Total P&L", f"₹{total_pnl:+,.0f}")
+                col2.metric("📊 Trades", len(traded))
+                col3.metric("🟢 Wins", profit_days)
+                col4.metric("🔴 Losses", loss_days)
+                col5.metric("📈 Win Rate", f"{profit_days/len(traded)*100:.0f}%")
+
+                # Monthly P&L
+                traded_copy = traded.copy()
+                traded_copy['month'] = traded_copy['date'].dt.strftime('%b %Y')
+                monthly = traded_copy.groupby('month')['pnl'].sum().reset_index()
+
+                fig_m = go.Figure(go.Bar(x=monthly['month'], y=monthly['pnl'],
+                    marker_color=['green' if p > 0 else 'red' for p in monthly['pnl']],
+                    text=[f"₹{p:+,.0f}" for p in monthly['pnl']], textposition='outside'))
+                fig_m.update_layout(height=300, title="Monthly P&L", yaxis_title="₹")
+                st.plotly_chart(fig_m, use_container_width=True)
+
+                # Equity curve
+                traded_sorted = traded.sort_values('date')
+                traded_sorted['cumulative'] = 175000 + traded_sorted['pnl'].cumsum()
+                fig_eq = go.Figure()
+                fig_eq.add_trace(go.Scatter(x=traded_sorted['date'], y=traded_sorted['cumulative'],
+                    mode='lines+markers', line=dict(color='#ff6b35', width=2),
+                    fill='tozeroy', fillcolor='rgba(255,107,53,0.1)'))
+                fig_eq.add_hline(y=175000, line_dash="dash", line_color="gray", annotation_text="Capital ₹1.75L")
+                fig_eq.update_layout(height=300, title="Equity Curve", yaxis_title="₹")
+                st.plotly_chart(fig_eq, use_container_width=True)
+
+                # Trade table
+                st.subheader("📜 All Trades")
+                display = traded[['Date','Stock','Gap%','Signal','Entry','SL','Target','Exit','Gross P&L','Charges','Net P&L','Result']].sort_values('Date', ascending=False)
+                st.dataframe(display, use_container_width=True, hide_index=True)
+            else:
+                st.info("No completed trades yet.")
+        else:
+            st.info("No data in Gap Go sheet yet. Import the backtest CSV.")
+    except Exception as e:
+        st.warning(f"Could not load Gap Go data: {e}")
