@@ -349,6 +349,9 @@ def show_intraday():
         st.warning(f"Could not load data: {e}")
 
 
+st.sidebar.title("📱 Strategy")
+page = st.sidebar.radio("Select", ["🏠 Overview", "📈 Monthly Momentum", "⚡ Intraday ORB", "🔥 Swing Futures"])
+
 if page == "🏠 Overview":
     st.title("🏠 Strategy Portfolio — Overview")
     st.caption("3 uncorrelated strategies | Total capital: ₹11.75L")
