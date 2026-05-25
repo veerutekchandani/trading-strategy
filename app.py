@@ -280,7 +280,7 @@ def show_intraday():
         if all_rows:
             last_row = all_rows[-1]
             status = last_row.get('Status', '')
-            stock_name = last_row.get('Stock', '')
+            stock_name = last_row.get('Stock', 'N/A')
             if status == 'IN TRADE':
                 st.error(f"""
                 ### 🔴 LIVE TRADE — {stock_name}
@@ -316,7 +316,7 @@ def show_intraday():
         all_rows = intraday_ws.get_all_records()
         if all_rows:
             tdf = pd.DataFrame(all_rows)
-            traded = tdf[tdf['Signal'].isin(['LONG', 'SHORT'])]
+            traded = tdf[tdf.get('Signal', tdf.get('signal', pd.Series())).isin(['LONG', 'SHORT'])] if 'Signal' in tdf.columns else tdf[tdf['Status'] == 'CLOSED']
             if not traded.empty:
                 traded['pnl'] = pd.to_numeric(traded['Net P&L'], errors='coerce').fillna(0)
                 wins = (traded['pnl'] > 0).sum()
@@ -339,7 +339,9 @@ def show_intraday():
                 fig.update_layout(height=300, title="Equity Curve", yaxis_title="₹")
                 st.plotly_chart(fig, use_container_width=True)
 
-                st.dataframe(traded[['Date','Stock','Signal','Entry','SL','Target','Exit','Net P&L','Result']].sort_values('Date', ascending=False),
+                # Show available columns
+                display_cols = [c for c in ['Date','Stock','Signal','Entry','SL','Target','Exit','Net P&L','Result'] if c in traded.columns]
+                st.dataframe(traded[display_cols].sort_values('Date', ascending=False),
                            use_container_width=True, hide_index=True)
             else:
                 st.info("No completed trades yet.")
