@@ -478,7 +478,7 @@ else:
                 fig.update_layout(height=300, title="Equity Curve", yaxis_title="₹")
                 st.plotly_chart(fig, use_container_width=True)
 
-                st.dataframe(closed[['Date','Stock','Entry','SL','Target','Exit','Exit Reason','P&L']].sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
+                st.dataframe(closed[['Date','Stock','Entry','SL','Target','Exit','Exit Date','Exit Reason','P&L']].sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
             else:
                 st.info("No closed trades yet.")
         else:
