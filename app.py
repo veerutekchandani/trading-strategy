@@ -5,7 +5,7 @@ import plotly.express as px
 import yfinance as yf
 from datetime import datetime
 import os, json
-from strategy import get_top_picks, get_live_price, is_skip_month, SKIP_MONTHS
+from strategy import get_top_picks, get_live_price, is_skip_month, SKIP_MONTHS, SL_PCT
 import sheets
 
 st.set_page_config(page_title="Momentum Strategy", page_icon="📈", layout="wide")
@@ -21,7 +21,7 @@ except Exception as e:
 
 def show_header():
     st.title("📈 Momentum Strategy Dashboard")
-    st.caption("Nifty 100 | Top 5 | 3-Month Lookback | Skip Jan-Mar")
+    st.caption("Nifty 100 | Top 3 | 3-Month Lookback | 3/3 Consistency | 52w High | 20% SL")
     if is_skip_month():
         st.warning(f"⚠️ **SKIP MONTH** ({datetime.now().strftime('%B')}). Stay in cash. Come back in April.")
 
@@ -130,7 +130,7 @@ def show_momentum_ranking():
     with col_a:
         lookback = st.selectbox("Lookback Period", [1, 2, 3, 4, 5, 6, 8, 10, 12], index=2, format_func=lambda x: f"{x} month{'s' if x > 1 else ''}")
     with col_b:
-        top_n = st.number_input("Top N Stocks", min_value=1, max_value=15, value=5)
+        top_n = st.number_input("Top N Stocks", min_value=1, max_value=15, value=3)
     with col_c:
         st.write("")
         st.write("")
@@ -174,7 +174,7 @@ def do_rebalance():
             st.success(f"✅ All sold. Cash: ₹{cash:,.0f}")
         return
 
-    st.info("This will sell stocks that dropped out of top 5 and buy new entries. Stocks still in top 5 are kept.")
+    st.info("This will sell stocks that dropped out of top 3 and buy new entries. Stocks still in top 3 are kept. 20% SL monitored daily.")
 
     if st.button("⚡ Execute Rebalance", type="primary"):
         with st.spinner("Calculating picks and executing trades..."):
@@ -251,7 +251,7 @@ def do_rebalance():
                                      round(ret_pct, 1), stocks_str)
 
             if not to_sell and not to_buy:
-                st.success("✅ No changes needed — same stocks remain in top 5!")
+                st.success("✅ No changes needed — same stocks remain in top 3!")
             else:
                 st.success(f"✅ Rebalance complete! Sold {len(to_sell)}, Bought {len(to_buy)}, Kept {len(to_keep)}")
             st.balloons()
@@ -260,35 +260,17 @@ def do_rebalance():
 # --- INTRADAY ORB FUNCTIONS ---
 def show_intraday():
     import plotly.graph_objects as go
-    import json
 
-    ORB_LOT = 65
+    STOCKS = ['RELIANCE','HDFCBANK','ICICIBANK','SBIN','INFY','BAJFINANCE','BHARTIARTL','AXISBANK','ITC','TCS']
     ORB_CAPITAL = 175000
-    ORB_MIN_RANGE = 50
-    ORB_MAX_RANGE = 200
-    ORB_TARGET_MULT = 1.5
-    ORB_TRADE_FILE = 'orb_trades.json'
+    ORB_LEVERAGE = 5
+    ORB_POSITION = ORB_CAPITAL * ORB_LEVERAGE
+    ORB_SL_MULT = 2.0
+    ORB_TARGET_MULT = 3.0
+    ORB_CHARGES = 358
 
-    def load_orb_trades():
-        if os.path.exists(ORB_TRADE_FILE):
-            with open(ORB_TRADE_FILE) as f:
-                return json.load(f)
-        return []
-
-    def save_orb_trades(trades):
-        with open(ORB_TRADE_FILE, 'w') as f:
-            json.dump(trades, f, indent=2)
-
-    @st.cache_data(ttl=60)
-    def get_nifty_today():
-        df = yf.download('^NSEI', period='5d', interval='5m', progress=False)
-        df.columns = df.columns.get_level_values(0)
-        df = df.dropna()
-        today = df.index[-1].date()
-        return df[df.index.date == today], df
-
-    st.title("⚡ Intraday ORB — Live Paper Trading")
-    st.caption("Nifty Futures | Lot: 65 | Capital: ₹1,75,000")
+    st.title("⚡ Stock ORB — Intraday")
+    st.caption("Top 10 Nifty Stocks | 15-min OR | SL 2× | TGT 3× | Range 0.5-3% | Capital ₹1.75L")
 
     # Show live trade status from Google Sheets
     try:
@@ -298,216 +280,119 @@ def show_intraday():
         if all_rows:
             last_row = all_rows[-1]
             status = last_row.get('Status', '')
+            stock_name = last_row.get('Stock', '')
             if status == 'IN TRADE':
                 st.error(f"""
-                ### 🔴 LIVE TRADE IN PROGRESS
+                ### 🔴 LIVE TRADE — {stock_name}
                 **Date:** {last_row['Date']} | **Direction:** {last_row['Signal']} | **Entry:** {last_row['Entry']}  
-                **SL:** {last_row['SL']} | **Target:** {last_row['Target']}  
-                Waiting for SL/Target/EOD exit...
+                **SL:** {last_row['SL']} | **Target:** {last_row['Target']}
                 """)
             elif status == 'WATCHING':
                 st.warning(f"""
-                ### ⏳ WATCHING FOR BREAKOUT
-                **Date:** {last_row['Date']} | **OR High:** {last_row['OR High']} | **OR Low:** {last_row['OR Low']} | **Range:** {last_row['Range']}
+                ### ⏳ WATCHING — {stock_name}
+                **Date:** {last_row['Date']} | **OR High:** {last_row['OR High']} | **OR Low:** {last_row['OR Low']} | **Range%:** {last_row.get('Range%', '')}
                 """)
             elif status == 'CLOSED' and last_row.get('Signal'):
                 pnl = last_row.get('Net P&L', 0)
-                emoji = '🟢' if float(pnl) > 0 else '🔴' if float(pnl) < 0 else '⚪'
+                try:
+                    pnl_val = float(pnl)
+                except:
+                    pnl_val = 0
+                emoji = '🟢' if pnl_val > 0 else '🔴' if pnl_val < 0 else '⚪'
                 st.info(f"""
-                ### {emoji} Last Trade: {last_row['Result']}
-                **Date:** {last_row['Date']} | **Direction:** {last_row['Signal']} | **Entry:** {last_row['Entry']} → **Exit:** {last_row['Exit']}  
-                **Net P&L:** ₹{float(pnl):+,.0f} | **Charges:** ₹{last_row.get('Charges', 912)}
+                ### {emoji} Last Trade: {stock_name} — {last_row['Result']}
+                **Date:** {last_row['Date']} | **{last_row['Signal']}** | Entry: {last_row['Entry']} → Exit: {last_row['Exit']}  
+                **Net P&L:** ₹{pnl_val:+,.0f}
                 """)
     except:
         pass
 
-    today_data, all_data = get_nifty_today()
-
-    if len(today_data) < 12:
-        st.warning("⏳ Market is closed or hasn't completed 30 minutes yet. Showing last trading day's data.")
-        # Show last complete trading day
-        all_data_copy = all_data.copy()
-        all_data_copy['date'] = all_data_copy.index.date
-        dates = sorted(all_data_copy['date'].unique())
-        for d in reversed(dates):
-            day = all_data_copy[all_data_copy['date'] == d]
-            if len(day) >= 6:
-                today_data = day
-                st.info(f"📅 Showing data for: **{d}**")
-                break
-
-    if len(today_data) < 12:
-        st.error("No data available.")
-        return
-
-    first_30 = today_data.iloc[:12]  # First hour = 12 candles of 5-min
-    orb_high = float(first_30['High'].max())
-    orb_low = float(first_30['Low'].min())
-    orb_range = orb_high - orb_low
-    current_price = float(today_data['Close'].iloc[-1])
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Nifty Now", f"{current_price:,.1f}")
-    col2.metric("OR High", f"{orb_high:,.1f}")
-    col3.metric("OR Low", f"{orb_low:,.1f}")
-    col4.metric("Range", f"{orb_range:,.0f} pts")
-
+    # Trade history from sheet
     st.divider()
-
-    if orb_range < ORB_MIN_RANGE:
-        st.error(f"❌ NO TRADE — Range too tight ({orb_range:.0f} < {ORB_MIN_RANGE})")
-    elif orb_range > ORB_MAX_RANGE:
-        st.error(f"❌ NO TRADE — Range too wide ({orb_range:.0f} > {ORB_MAX_RANGE})")
-    else:
-        target_long = orb_high + orb_range * ORB_TARGET_MULT
-        target_short = orb_low - orb_range * ORB_TARGET_MULT
-        sl_long = orb_high - orb_range * 0.5
-        sl_short = orb_low + orb_range * 0.5
-        risk = orb_range * 0.5 * ORB_LOT
-        reward = orb_range * ORB_TARGET_MULT * ORB_LOT
-
-        if current_price > orb_high:
-            st.success(f"### 🟢 BUY SIGNAL — Entry: {orb_high:.1f} | SL: {sl_long:.1f} | Target: {target_long:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
-        elif current_price < orb_low:
-            st.error(f"### 🔴 SHORT SIGNAL — Entry: {orb_low:.1f} | SL: {sl_short:.1f} | Target: {target_short:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
-        else:
-            st.info(f"### ⏳ WAITING — BUY above {orb_high:.1f} | SHORT below {orb_low:.1f}\nRisk: ₹{risk:,.0f} | Reward: ₹{reward:,.0f}")
-
-        # Chart
-        fig = go.Figure()
-        fig.add_trace(go.Candlestick(x=today_data.index, open=today_data['Open'],
-                                      high=today_data['High'], low=today_data['Low'],
-                                      close=today_data['Close'], name='Nifty'))
-        fig.add_hline(y=orb_high, line_dash="dash", line_color="green", annotation_text=f"OR High: {orb_high:.0f}")
-        fig.add_hline(y=orb_low, line_dash="dash", line_color="red", annotation_text=f"OR Low: {orb_low:.0f}")
-        fig.update_layout(height=400, xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
-
-    # Log trade
-    st.divider()
-    st.subheader("📝 Log Trade")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        direction = st.selectbox("Direction", ["LONG", "SHORT", "NO TRADE"])
-    with col2:
-        entry_p = st.number_input("Entry", value=int(orb_high) if orb_high else 0)
-    with col3:
-        exit_p = st.number_input("Exit", value=0)
-    with col4:
-        result = st.selectbox("Result", ["TARGET", "SL HIT", "EOD EXIT"])
-
-    if st.button("💾 Save Trade"):
-        if direction != "NO TRADE" and exit_p > 0:
-            pnl = ((exit_p - entry_p) if direction == "LONG" else (entry_p - exit_p)) * ORB_LOT - 400
-            trades = load_orb_trades()
-            trades.append({'date': datetime.now().strftime('%Y-%m-%d'), 'direction': direction,
-                          'entry': entry_p, 'exit': exit_p, 'pnl': round(pnl), 'result': result})
-            save_orb_trades(trades)
-            st.success(f"✅ Saved! P&L: ₹{pnl:+,.0f}")
-
-    # History
-    trades = load_orb_trades()
-    if trades:
-        st.divider()
-        st.subheader("📜 Trade History")
-        tdf = pd.DataFrame(trades)
-        st.dataframe(tdf, use_container_width=True, hide_index=True)
-        active = tdf[tdf['direction'] != 'NO TRADE']
-        if not active.empty:
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Total P&L", f"₹{active['pnl'].sum():+,.0f}")
-            col2.metric("Win Rate", f"{len(active[active['pnl']>0])}/{len(active)} ({len(active[active['pnl']>0])/len(active)*100:.0f}%)")
-            col3.metric("Portfolio", f"₹{ORB_CAPITAL + active['pnl'].sum():,.0f}")
-
-    # Backtest Calendar
-    st.divider()
-    st.subheader("📅 Trade History & Performance (2026)")
-
-    import plotly.express as px
+    st.subheader("📅 Trade History")
     try:
         import sheets as sh
         intraday_ws = sh.get_sheet().worksheet("Intraday")
-        all_records = intraday_ws.get_all_records()
-        if all_records:
-            cal_df = pd.DataFrame(all_records)
-            cal_df['date'] = pd.to_datetime(cal_df['Date'])
-            cal_df['pnl'] = pd.to_numeric(cal_df['Net P&L'], errors='coerce').fillna(0)
-            cal_df['direction'] = cal_df['Signal'].fillna('-').replace('', '-')
-            cal_df['result'] = cal_df['Result'].fillna('')
-            cal_df['range'] = pd.to_numeric(cal_df['Range'], errors='coerce').fillna(0)
-            cal_df['or_high'] = cal_df['OR High']
-            cal_df['or_low'] = cal_df['OR Low']
-            cal_df['entry'] = cal_df['Entry']
-            cal_df['exit'] = cal_df['Exit']
-            cal_df['gross'] = pd.to_numeric(cal_df['Gross P&L'], errors='coerce').fillna(0)
-            cal_df['charges'] = pd.to_numeric(cal_df['Charges'], errors='coerce').fillna(0)
+        all_rows = intraday_ws.get_all_records()
+        if all_rows:
+            tdf = pd.DataFrame(all_rows)
+            traded = tdf[tdf['Signal'].isin(['LONG', 'SHORT'])]
+            if not traded.empty:
+                traded['pnl'] = pd.to_numeric(traded['Net P&L'], errors='coerce').fillna(0)
+                wins = (traded['pnl'] > 0).sum()
+                total_pnl = traded['pnl'].sum()
 
-        # Summary metrics
-        traded = cal_df[cal_df['direction'] != '-']
-        profit_days = len(traded[traded['pnl'] > 0])
-        loss_days = len(traded[traded['pnl'] < 0])
-        no_trade = len(cal_df[cal_df['direction'] == '-'])
-        total_pnl = cal_df['pnl'].sum()
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("💰 Total P&L", f"₹{total_pnl:+,.0f}")
+                col2.metric("📊 Trades", len(traded))
+                col3.metric("🟢 Win Rate", f"{100*wins/len(traded):.0f}%")
+                col4.metric("📈 Avg P&L", f"₹{total_pnl/len(traded):+,.0f}")
 
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("💰 Total P&L", f"₹{total_pnl:+,.0f}")
-        col2.metric("📊 Total Trades", len(traded))
-        col3.metric("🟢 Wins", profit_days)
-        col4.metric("🔴 Losses", loss_days)
-        col5.metric("📈 Win Rate", f"{profit_days/len(traded)*100:.0f}%" if len(traded) > 0 else "0%")
+                # Equity curve
+                traded_sorted = traded.sort_values('Date')
+                traded_sorted['cumulative'] = ORB_CAPITAL + traded_sorted['pnl'].cumsum()
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=traded_sorted['Date'], y=traded_sorted['cumulative'],
+                    mode='lines+markers', line=dict(color='#2196F3', width=2),
+                    fill='tozeroy', fillcolor='rgba(33,150,243,0.1)'))
+                fig.add_hline(y=ORB_CAPITAL, line_dash="dash", line_color="gray", annotation_text="Capital ₹1.75L")
+                fig.update_layout(height=300, title="Equity Curve", yaxis_title="₹")
+                st.plotly_chart(fig, use_container_width=True)
 
-        # Monthly P&L summary
-        cal_df['month'] = cal_df['date'].dt.strftime('%b %Y')
-        monthly = cal_df.groupby('month').agg(
-            trades=('direction', lambda x: sum(x != '-')),
-            pnl=('pnl', 'sum'),
-            wins=('pnl', lambda x: sum(x > 0))
-        ).reset_index()
-
-        st.subheader("📊 Monthly P&L")
-        fig_monthly = go.Figure(go.Bar(
-            x=monthly['month'], y=monthly['pnl'],
-            marker_color=['green' if p > 0 else 'red' for p in monthly['pnl']],
-            text=[f"₹{p:+,.0f}" for p in monthly['pnl']],
-            textposition='outside'
-        ))
-        fig_monthly.update_layout(height=300, yaxis_title="P&L (₹)", xaxis_title="")
-        st.plotly_chart(fig_monthly, use_container_width=True)
-
-        # Equity curve
-        traded_only = cal_df[cal_df['pnl'] != 0].copy()
-        if not traded_only.empty:
-            traded_only['cumulative'] = ORB_CAPITAL + traded_only['pnl'].cumsum()
-            fig_eq = go.Figure()
-            fig_eq.add_trace(go.Scatter(x=traded_only['date'], y=traded_only['cumulative'],
-                                        mode='lines+markers', line=dict(color='#00d4aa', width=2),
-                                        fill='tozeroy', fillcolor='rgba(0,212,170,0.1)'))
-            fig_eq.add_hline(y=ORB_CAPITAL, line_dash="dash", line_color="gray", annotation_text=f"Capital ₹{ORB_CAPITAL:,.0f}")
-            fig_eq.update_layout(height=300, title="Equity Curve", yaxis_title="Portfolio (₹)")
-            st.plotly_chart(fig_eq, use_container_width=True)
-
-        # Trade history table
-        st.subheader("📜 All Trades")
-        display_df = cal_df[cal_df['direction'] != '-'][['date', 'direction', 'or_high', 'or_low', 'range', 'entry', 'exit', 'gross', 'charges', 'pnl', 'result']].copy()
-        display_df.columns = ['Date', 'Direction', 'OR High', 'OR Low', 'Range', 'Entry', 'Exit', 'Gross', 'Charges', 'Net P&L', 'Result']
-        display_df = display_df.sort_values('Date', ascending=False)
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+                st.dataframe(traded[['Date','Stock','Signal','Entry','SL','Target','Exit','Net P&L','Result']].sort_values('Date', ascending=False),
+                           use_container_width=True, hide_index=True)
+            else:
+                st.info("No completed trades yet.")
+        else:
+            st.info("No trade data yet. ORB cron will populate this.")
     except Exception as e:
-        st.warning(f"Could not load intraday data from Google Sheet: {e}")
+        st.warning(f"Could not load data: {e}")
 
 
-# --- MAIN APP ---
-import os
+if page == "🏠 Overview":
+    st.title("🏠 Strategy Portfolio — Overview")
+    st.caption("3 uncorrelated strategies | Total capital: ₹11.75L")
+    st.markdown("""
+---
+## 1. ⚡ Stock ORB (Intraday) — +32% CAGR
+| Parameter | Value |
+|-----------|-------|
+| **Instrument** | Intraday (MIS), 5x leverage |
+| **Capital** | ₹1,75,000 |
+| **Universe** | Top 10 Nifty stocks |
 
-st.sidebar.title("📱 Strategy")
-page = st.sidebar.radio("Select", ["📈 Monthly Momentum", "⚡ Intraday ORB", "🚀 Gap & Go"])
+**Entry:** Pick stock with biggest 15-min range (0.5-3%). Limit order at OR High/Low at 9:36 AM. Cancel by 10:00 AM.
 
-if page == "📈 Monthly Momentum":
-    show_header()
-    tab1, tab2, tab3, tab4 = st.tabs(["💼 Portfolio", "📊 Performance", "🏆 Rankings", "🔄 Rebalance"])
+**Exit:** SL: 2.0× range | Target: 3.0× range | EOD: 2:15 PM
+
+---
+## 2. 📈 Monthly Momentum (Delivery) — +29% CAGR
+| Parameter | Value |
+|-----------|-------|
+| **Instrument** | Delivery (CNC), no leverage |
+| **Capital** | ₹5,00,000 |
+| **Universe** | Nifty 100 stocks |
+
+**Entry:** Last trading day of month. Top 3 by 3-month momentum. Filters: 3/3 consistency + within 10% of 52w high.
+
+**Exit:** Hold till next month-end. 20% SL (GTT order).
+
+---
+## 3. 🔥 Volume Breakout Swing (Futures) — +33.5% CAGR
+| Parameter | Value |
+|-----------|-------|
+| **Instrument** | Stock Futures (NRML), ~5x leverage |
+| **Capital** | ₹5,00,000 margin |
+| **Universe** | ~210 F&O stocks |
+
+**Entry:** Vol>2.5x + Strong close (top 30%) + EMA20>EMA50 + 20d return>10% + ATR<4% + Nifty>50EMA
+
+**Exit:** SL: 1.5×ATR (GTT) | Target: 2.5×ATR | Max hold: 5 days | Max 3 positions
+    """)
+elif page == "📈 Monthly Momentum":
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Portfolio", "📈 Chart", "🔍 Ranking", "🔄 Rebalance"])
     with tab1:
         show_portfolio()
-        show_trades()
     with tab2:
         show_monthly_chart()
     with tab3:
@@ -517,102 +402,81 @@ if page == "📈 Monthly Momentum":
 elif page == "⚡ Intraday ORB":
     show_intraday()
 else:
-    # Gap & Go page
-    st.title("🚀 Gap & Go — Live Paper Trading")
-    st.caption("Top 1 Stock | Gap >1% | Entry +0.5% | SL 0.5% | Target 1.5% | Exit 11:15 AM")
+    # Swing Futures page
+    st.title("🔥 Volume Breakout Swing — Futures")
+    st.caption("F&O Stocks | Vol>2.5x | Strong Close | EMA Stack | ATR<4% | Nifty>50EMA | SL 1.5×ATR | TGT 2.5×ATR | 5-day hold")
 
     # Live trade status from Google Sheet
     try:
         import sheets as sh
-        gap_ws = sh.get_sheet().worksheet("Gap Go")
-        gap_records = gap_ws.get_all_records()
-        if gap_records:
-            last = gap_records[-1]
-            status = last.get('Status', '')
-            if status == 'IN TRADE':
-                st.error(f"""
-                ### 🔴 LIVE TRADE IN PROGRESS
-                **Date:** {last['Date']} | **Stock:** {last['Stock']} | **Direction:** {last['Signal']}  
-                **Entry:** {last['Entry']} | **SL:** {last['SL']} | **Target:** {last['Target']}
-                """)
-            elif status == 'ALERT SENT':
-                st.warning(f"""
-                ### ⏳ ALERT SENT — WAITING FOR ENTRY
-                **Date:** {last['Date']} | **Stock:** {last['Stock']} | **Gap:** {last['Gap%']}%
-                """)
-            elif status == 'CLOSED' and last.get('Signal'):
-                pnl = last.get('Net P&L', 0)
-                try:
-                    pnl_val = float(pnl)
-                except:
-                    pnl_val = 0
-                emoji = '🟢' if pnl_val > 0 else '🔴' if pnl_val < 0 else '⚪'
-                st.info(f"""
-                ### {emoji} Last Trade: {last['Result']}
-                **Date:** {last['Date']} | **Stock:** {last['Stock']} | **{last['Signal']}**  
-                **Entry:** {last['Entry']} → **Exit:** {last['Exit']} | **Net P&L:** ₹{pnl_val:+,.0f}
-                """)
+        swing_ws = sh.get_sheet().worksheet("Swing")
+        swing_records = swing_ws.get_all_records()
+        if swing_records:
+            open_trades = [r for r in swing_records if r.get('Status') == 'OPEN']
+            if open_trades:
+                st.error(f"### 🔴 {len(open_trades)} OPEN POSITION(S)")
+                for t in open_trades:
+                    live_p = get_live_price(t['Stock'] + '.NS')
+                    pnl_pct = ((live_p - float(t['Entry'])) / float(t['Entry']) * 100) if live_p else 0
+                    st.write(f"**{t['Stock']}** | Entry: ₹{t['Entry']} | SL: ₹{t['SL']} | TGT: ₹{t['Target']} | Day {t.get('Day','')} | Live: ₹{live_p or '?'} ({pnl_pct:+.1f}%)")
+            else:
+                last = swing_records[-1]
+                pnl = float(last.get('P&L', 0)) if last.get('P&L') else 0
+                emoji = '🟢' if pnl > 0 else '🔴'
+                st.info(f"### {emoji} Last Trade: {last['Stock']} | ₹{pnl:+,.0f} | {last.get('Exit Reason','')}")
     except:
         pass
 
-    # Trade history from Google Sheet
+    # Nifty regime check
     st.divider()
-    st.subheader("📅 Trade History & Performance")
+    st.subheader("📊 Market Regime")
+    try:
+        nifty = yf.download('^NSEI', period='3mo', progress=False)
+        nifty.columns = nifty.columns.get_level_values(0)
+        nifty['EMA50'] = nifty['Close'].ewm(span=50).mean()
+        nifty_above = float(nifty['Close'].iloc[-1]) > float(nifty['EMA50'].iloc[-1])
+        if nifty_above:
+            st.success(f"✅ Nifty ({nifty['Close'].iloc[-1]:,.0f}) is ABOVE 50 EMA ({nifty['EMA50'].iloc[-1]:,.0f}) — TRADING ACTIVE")
+        else:
+            st.error(f"🛑 Nifty ({nifty['Close'].iloc[-1]:,.0f}) is BELOW 50 EMA ({nifty['EMA50'].iloc[-1]:,.0f}) — NO NEW TRADES")
+    except:
+        st.warning("Could not fetch Nifty data")
 
+    # Trade history
+    st.divider()
+    st.subheader("📅 Trade History")
     try:
         import sheets as sh
-        gap_ws = sh.get_sheet().worksheet("Gap Go")
-        all_records = gap_ws.get_all_records()
+        swing_ws = sh.get_sheet().worksheet("Swing")
+        all_records = swing_ws.get_all_records()
         if all_records:
-            cal_df = pd.DataFrame(all_records)
-            cal_df['date'] = pd.to_datetime(cal_df['Date'])
-            cal_df['pnl'] = pd.to_numeric(cal_df['Net P&L'], errors='coerce').fillna(0)
-            cal_df['direction'] = cal_df['Signal'].fillna('-').replace('', '-')
-
-            traded = cal_df[cal_df['direction'].isin(['LONG', 'SHORT'])]
-            traded = traded[traded['Result'].isin(['TARGET', 'SL HIT', 'EOD EXIT'])]
-
-            if not traded.empty:
-                profit_days = len(traded[traded['pnl'] > 0])
-                loss_days = len(traded[traded['pnl'] < 0])
-                total_pnl = traded['pnl'].sum()
-
-                col1, col2, col3, col4, col5 = st.columns(5)
+            sdf = pd.DataFrame(all_records)
+            sdf['pnl'] = pd.to_numeric(sdf.get('P&L', 0), errors='coerce').fillna(0)
+            closed = sdf[sdf['Status'] == 'CLOSED']
+            if not closed.empty:
+                total_pnl = closed['pnl'].sum()
+                wins = (closed['pnl'] > 0).sum()
+                col1, col2, col3, col4 = st.columns(4)
                 col1.metric("💰 Total P&L", f"₹{total_pnl:+,.0f}")
-                col2.metric("📊 Trades", len(traded))
-                col3.metric("🟢 Wins", profit_days)
-                col4.metric("🔴 Losses", loss_days)
-                col5.metric("📈 Win Rate", f"{profit_days/len(traded)*100:.0f}%")
-
-                # Monthly P&L
-                traded_copy = traded.copy()
-                traded_copy['month'] = traded_copy['date'].dt.strftime('%b %Y')
-                monthly = traded_copy.groupby('month')['pnl'].sum().reset_index()
-
-                fig_m = go.Figure(go.Bar(x=monthly['month'], y=monthly['pnl'],
-                    marker_color=['green' if p > 0 else 'red' for p in monthly['pnl']],
-                    text=[f"₹{p:+,.0f}" for p in monthly['pnl']], textposition='outside'))
-                fig_m.update_layout(height=300, title="Monthly P&L", yaxis_title="₹")
-                st.plotly_chart(fig_m, use_container_width=True)
+                col2.metric("📊 Trades", len(closed))
+                col3.metric("🟢 Win Rate", f"{100*wins/len(closed):.0f}%")
+                col4.metric("📈 Avg P&L", f"₹{total_pnl/len(closed):+,.0f}")
 
                 # Equity curve
-                traded_sorted = traded.sort_values('date')
-                traded_sorted['cumulative'] = 175000 + traded_sorted['pnl'].cumsum()
-                fig_eq = go.Figure()
-                fig_eq.add_trace(go.Scatter(x=traded_sorted['date'], y=traded_sorted['cumulative'],
+                closed_sorted = closed.sort_values('Date')
+                closed_sorted['cumulative'] = 500000 + closed_sorted['pnl'].cumsum()
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=closed_sorted['Date'], y=closed_sorted['cumulative'],
                     mode='lines+markers', line=dict(color='#ff6b35', width=2),
                     fill='tozeroy', fillcolor='rgba(255,107,53,0.1)'))
-                fig_eq.add_hline(y=175000, line_dash="dash", line_color="gray", annotation_text="Capital ₹1.75L")
-                fig_eq.update_layout(height=300, title="Equity Curve", yaxis_title="₹")
-                st.plotly_chart(fig_eq, use_container_width=True)
+                fig.add_hline(y=500000, line_dash="dash", line_color="gray", annotation_text="Capital ₹5L")
+                fig.update_layout(height=300, title="Equity Curve", yaxis_title="₹")
+                st.plotly_chart(fig, use_container_width=True)
 
-                # Trade table
-                st.subheader("📜 All Trades")
-                display = traded[['Date','Stock','Gap%','Signal','Entry','SL','Target','Exit','Gross P&L','Charges','Net P&L','Result']].sort_values('Date', ascending=False)
-                st.dataframe(display, use_container_width=True, hide_index=True)
+                st.dataframe(closed[['Date','Stock','Entry','SL','Target','Exit','Exit Reason','P&L']].sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
             else:
-                st.info("No completed trades yet.")
+                st.info("No closed trades yet.")
         else:
-            st.info("No data in Gap Go sheet yet. Import the backtest CSV.")
+            st.info("No swing trade data yet. Scanner will populate this.")
     except Exception as e:
-        st.warning(f"Could not load Gap Go data: {e}")
+        st.warning(f"Could not load Swing data: {e}")
