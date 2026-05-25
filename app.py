@@ -5,7 +5,7 @@ import plotly.express as px
 import yfinance as yf
 from datetime import datetime
 import os, json
-from strategy import get_top_picks, get_live_price, is_skip_month, SKIP_MONTHS, SL_PCT
+from strategy import get_top_picks, get_live_price, is_skip_month, SKIP_MONTHS
 import sheets
 
 st.set_page_config(page_title="Momentum Strategy", page_icon="📈", layout="wide")
