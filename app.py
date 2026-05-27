@@ -352,11 +352,11 @@ def show_intraday():
 
 
 st.sidebar.title("📱 Strategy")
-page = st.sidebar.radio("Select", ["🏠 Overview", "📈 Monthly Momentum", "⚡ Intraday ORB", "🔥 Swing Futures"])
+page = st.sidebar.radio("Select", ["🏠 Overview", "📈 Monthly Momentum", "⚡ Intraday ORB", "🔥 Swing Futures", "🎯 Multi-Stock ORB"])
 
 if page == "🏠 Overview":
     st.title("🏠 Strategy Portfolio — Overview")
-    st.caption("3 uncorrelated strategies | Total capital: ₹11.75L")
+    st.caption("4 uncorrelated strategies | Total capital: ₹12.95L")
     st.markdown("""
 ---
 ## 1. ⚡ Stock ORB (Intraday) — +32% CAGR
@@ -393,6 +393,18 @@ if page == "🏠 Overview":
 **Entry:** Vol>2.5x + Strong close (top 30%) + EMA20>EMA50 + 20d return>10% + ATR<4% + Nifty>50EMA
 
 **Exit:** SL: 1.5×ATR (GTT) | Target: 2.5×ATR | Max hold: 5 days | Max 3 positions
+
+---
+## 4. 🎯 Multi-Stock ORB (Intraday) — +88% CAGR
+| Parameter | Value |
+|-----------|-------|
+| **Instrument** | Intraday (MIS), 5x leverage |
+| **Capital** | ₹1,20,000 |
+| **Universe** | 87 F&O stocks (9 sector indices) |
+
+**Entry:** Scan all 87 stocks at 9:30. Filter OR range 0.7-1.5%. Pick top 3 by OR size. Market order on breakout (9:36-10:00 AM).
+
+**Exit:** SL: opposite side of OR | Target: 3× OR range | EOD: 3:15 PM
     """)
 elif page == "📈 Monthly Momentum":
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Portfolio", "📈 Chart", "🔍 Ranking", "🔄 Rebalance"])
@@ -406,7 +418,7 @@ elif page == "📈 Monthly Momentum":
         do_rebalance()
 elif page == "⚡ Intraday ORB":
     show_intraday()
-else:
+elif page == "🔥 Swing Futures":
     # Swing Futures page
     st.title("🔥 Volume Breakout Swing — Futures")
     st.caption("F&O Stocks | Vol>2.5x | Strong Close | EMA Stack | ATR<4% | Nifty>50EMA | SL 1.5×ATR | TGT 2.5×ATR | 5-day hold")
@@ -485,3 +497,81 @@ else:
             st.info("No swing trade data yet. Scanner will populate this.")
     except Exception as e:
         st.warning(f"Could not load Swing data: {e}")
+
+elif page == "🎯 Multi-Stock ORB":
+    st.title("🎯 Multi-Stock ORB — Intraday")
+    st.caption("87 F&O Stocks | OR 0.7-1.5% | Top 3 | Entry 9:36-10:00 | Exit 3:15 PM | 88% CAGR")
+
+    # Backtest results
+    st.subheader("📊 Backtest Results (2018-2024)")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("CAGR", "87.7%")
+    col2.metric("Max Drawdown", "-27.2%")
+    col3.metric("Win Rate", "~49%")
+    col4.metric("Trades/Day", "3")
+
+    yearly_data = {
+        "Year": [2018, 2019, 2020, 2021, 2022, 2023, 2024],
+        "Return": [131.9, 29.9, 145.5, 137.3, 134.1, 14.4, 74.7],
+        "Trades": [735, 732, 712, 741, 738, 735, 744],
+        "Win%": [49.0, 46.6, 49.0, 50.2, 51.2, 49.3, 46.1],
+    }
+    ydf = pd.DataFrame(yearly_data)
+
+    fig = go.Figure()
+    colors = ['#00cc96' if r > 0 else '#ef553b' for r in ydf["Return"]]
+    fig.add_trace(go.Bar(x=ydf["Year"], y=ydf["Return"], marker_color=colors, text=[f"+{r:.0f}%" for r in ydf["Return"]], textposition="outside"))
+    fig.update_layout(height=350, title="Yearly Returns", yaxis_title="%", showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.dataframe(ydf, use_container_width=True, hide_index=True)
+
+    # Strategy rules
+    st.divider()
+    st.subheader("📋 Strategy Rules")
+    st.markdown("""
+**Universe:** 87 F&O stocks across 9 Nifty sector indices
+
+**Scan (9:30 AM):**
+1. Calculate 15-min Opening Range (9:15–9:30) for each stock
+2. Filter: OR range = 0.7% to 1.5% of price
+3. Rank by OR range (biggest first), pick top 3
+
+**Entry (9:36–10:00 AM):**
+- Stock breaks above OR high → BUY (LONG)
+- Stock breaks below OR low → SELL (SHORT)
+- No breakout by 10:00 → skip
+
+**Exit:**
+- SL: opposite side of OR
+- Target: 3× OR range
+- Time: 3:15 PM (if no SL/TGT hit)
+
+**Capital:** ₹1.2L (with 5x intraday margin = ₹6L exposure)
+    """)
+
+    # Live trades from Google Sheet (future)
+    st.divider()
+    st.subheader("📅 Paper Trades")
+    try:
+        import sheets as sh
+        ms_ws = sh.get_sheet().worksheet("MultiORB")
+        records = ms_ws.get_all_records()
+        if records:
+            msdf = pd.DataFrame(records)
+            msdf['pnl'] = pd.to_numeric(msdf.get('P&L', 0), errors='coerce').fillna(0)
+            closed = msdf[msdf.get('Status', '') == 'CLOSED'] if 'Status' in msdf.columns else msdf
+            if not closed.empty and closed['pnl'].sum() != 0:
+                total_pnl = closed['pnl'].sum()
+                wins = (closed['pnl'] > 0).sum()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("💰 Total P&L", f"₹{total_pnl:+,.0f}")
+                c2.metric("📊 Trades", len(closed))
+                c3.metric("🟢 Win Rate", f"{100*wins/len(closed):.0f}%")
+                st.dataframe(closed.sort_values('Date', ascending=False).head(20), use_container_width=True, hide_index=True)
+            else:
+                st.info("No closed trades yet. Cron will populate this.")
+        else:
+            st.info("No trade data yet. Waiting for cron to start.")
+    except:
+        st.info("📌 MultiORB worksheet not created yet. Will be populated when cron starts.")
