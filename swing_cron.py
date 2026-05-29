@@ -178,7 +178,7 @@ def run():
             pnl = round((exit_price - entry_price) * qty)
 
             # Update sheet
-            ws.update(f'F{row_num}:I{row_num}', [[round(exit_price, 2), today, pnl, 'CLOSED']])
+            ws.update(f'E{row_num}:G{row_num}', [[round(exit_price, 2), pnl, 'CLOSED']])
             exits.append(f"{stock}: Entry ₹{entry_price:.0f} → Exit ₹{exit_price:.0f} | P&L: Rs{pnl:+,}")
 
     if exits:
@@ -223,7 +223,7 @@ def run():
         msg_lines.append("")
 
         # Write to sheet
-        ws.append_row([today, p['stock'], p['price'], sell_date.strftime('%Y-%m-%d'), '', '', '', 'OPEN'])
+        ws.append_row([today, p['stock'], p['price'], sell_date.strftime('%Y-%m-%d'), '', '', 'OPEN'])
 
     msg_lines.append(f"Hold 5 days. No SL. Sell at close on exit day.")
     send_telegram("\n".join(msg_lines))
