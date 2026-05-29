@@ -395,15 +395,58 @@ if page == "🏠 Overview":
 **Exit:** Sell at close after 5 trading days. No SL. Max 3 positions.
     """)
 elif page == "📈 Monthly Momentum":
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Portfolio", "📈 Chart", "🔍 Ranking", "🔄 Rebalance"])
-    with tab1:
-        show_portfolio()
-    with tab2:
-        show_monthly_chart()
-    with tab3:
-        show_momentum_ranking()
-    with tab4:
-        do_rebalance()
+    st.title("📈 Monthly Momentum — Delivery")
+    st.caption("Nifty 100 | Top 3 by 3-month return | 3/3 consistency | 52w high | Nifty trend filter | Hold 1 month")
+
+    try:
+        sheets.init_sheets()
+        sh = sheets.get_sheet()
+        momentum_ws = sh.worksheet("Momentum")
+        records = momentum_ws.get_all_records()
+
+        if records:
+            mdf = pd.DataFrame(records)
+
+            # Open positions
+            open_pos = mdf[mdf["Status"] == "OPEN"]
+            if not open_pos.empty:
+                st.error(f"### 🟢 {len(open_pos)} OPEN POSITION(S)")
+                for _, pos in open_pos.iterrows():
+                    live_p = get_live_price(pos["Stock"] + ".NS") if pos["Stock"] != "SKIPPED" else None
+                    if live_p and pos["Entry"]:
+                        pnl = (live_p / float(pos["Entry"]) - 1) * 100
+                        st.write(f"**{pos['Stock']}** | Entry: ₹{pos['Entry']} | Live: ₹{live_p:.0f} ({pnl:+.1f}%)")
+                    else:
+                        st.write(f"**{pos['Stock']}** | Entry: ₹{pos['Entry']}")
+            else:
+                st.info("No open positions. Waiting for next month-end signal.")
+
+            # Closed trades
+            closed = mdf[(mdf["Status"] == "CLOSED") & (mdf["Stock"] != "SKIPPED")]
+            if not closed.empty:
+                closed["P&L%"] = pd.to_numeric(closed["P&L%"], errors="coerce").fillna(0)
+                st.divider()
+                st.subheader("📊 Performance")
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total P&L%", f"{closed['P&L%'].sum():+.1f}%")
+                col2.metric("Trades", len(closed))
+                col3.metric("Win Rate", f"{(closed['P&L%']>0).mean()*100:.0f}%")
+
+                st.divider()
+                st.subheader("📅 Trade History")
+                st.dataframe(mdf.sort_values("Month", ascending=False), use_container_width=True, hide_index=True)
+            else:
+                st.info("No closed trades yet.")
+
+            # Skipped months
+            skipped = mdf[mdf["Stock"] == "SKIPPED"]
+            if not skipped.empty:
+                st.divider()
+                st.caption(f"Months skipped (Nifty bearish): {', '.join(skipped['Month'].tolist())}")
+        else:
+            st.info("No data yet. Cron will populate on next month-end.")
+    except Exception as e:
+        st.warning(f"Could not load Momentum data: {e}")
 elif page == "⚡ Intraday ORB":
     show_intraday()
 elif page == "🔥 Swing Futures":
