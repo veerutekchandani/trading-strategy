@@ -359,16 +359,16 @@ if page == "🏠 Overview":
     st.caption("3 uncorrelated strategies | Total capital: ₹12.2L")
     st.markdown("""
 ---
-## 1. 📈 Monthly Momentum (Delivery) — +29% CAGR
+## 1. 📈 Monthly Momentum (Delivery) — +77% CAGR
 | Parameter | Value |
 |-----------|-------|
 | **Instrument** | Delivery (CNC), no leverage |
 | **Capital** | ₹5,00,000 |
 | **Universe** | Nifty 100 stocks |
 
-**Entry:** Last trading day of month. Top 3 by 3-month momentum. Filters: 3/3 consistency + within 10% of 52w high.
+**Entry:** Last trading day of month. Top 3 by 3-month momentum. Filters: 3/3 consistency + within 10% of 52w high. Nifty 10EMA > 20EMA (skip bearish months).
 
-**Exit:** Hold till next month-end. 20% SL (GTT order).
+**Exit:** Hold till next month-end. No SL.
 
 ---
 ## 2. 🎯 Multi-Stock ORB (Intraday) — +44% CAGR
@@ -447,85 +447,52 @@ elif page == "📈 Monthly Momentum":
             st.info("No data yet. Cron will populate on next month-end.")
     except Exception as e:
         st.warning(f"Could not load Momentum data: {e}")
-elif page == "⚡ Intraday ORB":
-    show_intraday()
 elif page == "🔥 Swing Futures":
     # Swing page
     st.title("🔥 EMA Stack Swing — Delivery")
     st.caption("87 F&O Stocks | EMA 5>10>20>50 | Vol>1.5x | 5d ret>3% | Hold 5 days | No SL | 94% CAGR")
 
-    # Live trade status from Google Sheet
     try:
-        import sheets as sh
-        swing_ws = sh.get_sheet().worksheet("Swing")
-        swing_records = swing_ws.get_all_records()
-        if swing_records:
-            open_trades = [r for r in swing_records if r.get('Status') == 'OPEN']
-            if open_trades:
-                st.error(f"### 🔴 {len(open_trades)} OPEN POSITION(S)")
-                for t in open_trades:
+        sheets.init_sheets()
+        sh = sheets.get_sheet()
+        swing_ws = sh.worksheet("Swing")
+        records = swing_ws.get_all_records()
+
+        if records:
+            sdf = pd.DataFrame(records)
+
+            # Open positions
+            open_pos = sdf[sdf["Status"] == "OPEN"]
+            if not open_pos.empty:
+                st.error(f"### 🟢 {len(open_pos)} OPEN POSITION(S)")
+                for _, t in open_pos.iterrows():
                     live_p = get_live_price(t['Stock'] + '.NS')
-                    pnl_pct = ((live_p - float(t['Entry'])) / float(t['Entry']) * 100) if live_p else 0
-                    st.write(f"**{t['Stock']}** | Entry: ₹{t['Entry']} | SL: ₹{t['SL']} | TGT: ₹{t['Target']} | Day {t.get('Day','')} | Live: ₹{live_p or '?'} ({pnl_pct:+.1f}%)")
+                    entry = float(t['Entry']) if t['Entry'] else 0
+                    pnl_pct = ((live_p - entry) / entry * 100) if live_p and entry else 0
+                    st.write(f"**{t['Stock']}** | Entry: ₹{entry:.0f} | Sell: {t.get('Sell Date','')} | Live: ₹{live_p or '?':.0f} ({pnl_pct:+.1f}%)")
             else:
-                last = swing_records[-1]
-                pnl = float(last.get('P&L', 0)) if last.get('P&L') else 0
-                emoji = '🟢' if pnl > 0 else '🔴'
-                st.info(f"### {emoji} Last Trade: {last['Stock']} | ₹{pnl:+,.0f} | {last.get('Exit Reason','')}")
-    except:
-        pass
+                st.info("No open positions. Waiting for next signal.")
 
-    # Nifty regime check
-    st.divider()
-    st.subheader("📊 Market Regime")
-    try:
-        nifty = yf.download('^NSEI', period='3mo', progress=False)
-        nifty.columns = nifty.columns.get_level_values(0)
-        nifty['EMA50'] = nifty['Close'].ewm(span=50).mean()
-        nifty_above = float(nifty['Close'].iloc[-1]) > float(nifty['EMA50'].iloc[-1])
-        if nifty_above:
-            st.success(f"✅ Nifty ({nifty['Close'].iloc[-1]:,.0f}) is ABOVE 50 EMA ({nifty['EMA50'].iloc[-1]:,.0f}) — TRADING ACTIVE")
-        else:
-            st.error(f"🛑 Nifty ({nifty['Close'].iloc[-1]:,.0f}) is BELOW 50 EMA ({nifty['EMA50'].iloc[-1]:,.0f}) — NO NEW TRADES")
-    except:
-        st.warning("Could not fetch Nifty data")
-
-    # Trade history
-    st.divider()
-    st.subheader("📅 Trade History")
-    try:
-        import sheets as sh
-        swing_ws = sh.get_sheet().worksheet("Swing")
-        all_records = swing_ws.get_all_records()
-        if all_records:
-            sdf = pd.DataFrame(all_records)
-            sdf['pnl'] = pd.to_numeric(sdf.get('P&L', 0), errors='coerce').fillna(0)
-            closed = sdf[sdf['Status'] == 'CLOSED']
+            # Closed trades
+            closed = sdf[sdf["Status"] == "CLOSED"]
             if not closed.empty:
-                total_pnl = closed['pnl'].sum()
-                wins = (closed['pnl'] > 0).sum()
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("💰 Total P&L", f"₹{total_pnl:+,.0f}")
+                closed["P&L"] = pd.to_numeric(closed.get("P&L", 0), errors="coerce").fillna(0)
+                st.divider()
+                st.subheader("📊 Performance")
+                total_pnl = closed["P&L"].sum()
+                wins = (closed["P&L"] > 0).sum()
+                col1, col2, col3 = st.columns(3)
+                col1.metric("💰 Total P&L%", f"{total_pnl:+.1f}%")
                 col2.metric("📊 Trades", len(closed))
                 col3.metric("🟢 Win Rate", f"{100*wins/len(closed):.0f}%")
-                col4.metric("📈 Avg P&L", f"₹{total_pnl/len(closed):+,.0f}")
 
-                # Equity curve
-                closed_sorted = closed.sort_values('Date')
-                closed_sorted['cumulative'] = 500000 + closed_sorted['pnl'].cumsum()
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=closed_sorted['Date'], y=closed_sorted['cumulative'],
-                    mode='lines+markers', line=dict(color='#ff6b35', width=2),
-                    fill='tozeroy', fillcolor='rgba(255,107,53,0.1)'))
-                fig.add_hline(y=500000, line_dash="dash", line_color="gray", annotation_text="Capital ₹5L")
-                fig.update_layout(height=300, title="Equity Curve", yaxis_title="₹")
-                st.plotly_chart(fig, use_container_width=True)
-
-                st.dataframe(closed[['Date','Stock','Entry','SL','Target','Exit','Exit Date','Exit Reason','P&L']].sort_values('Date', ascending=False), use_container_width=True, hide_index=True)
+                st.divider()
+                st.subheader("📅 Trade History")
+                st.dataframe(sdf.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
             else:
                 st.info("No closed trades yet.")
         else:
-            st.info("No swing trade data yet. Scanner will populate this.")
+            st.info("No swing data yet. Cron will populate on next signal.")
     except Exception as e:
         st.warning(f"Could not load Swing data: {e}")
 
