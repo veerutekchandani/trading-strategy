@@ -356,22 +356,10 @@ page = st.sidebar.radio("Select", ["🏠 Overview", "📈 Monthly Momentum", "�
 
 if page == "🏠 Overview":
     st.title("🏠 Strategy Portfolio — Overview")
-    st.caption("4 uncorrelated strategies | Total capital: ₹12.95L")
+    st.caption("3 uncorrelated strategies | Total capital: ₹12.2L")
     st.markdown("""
 ---
-## 1. ⚡ Stock ORB (Intraday) — +32% CAGR
-| Parameter | Value |
-|-----------|-------|
-| **Instrument** | Intraday (MIS), 5x leverage |
-| **Capital** | ₹1,75,000 |
-| **Universe** | Top 10 Nifty stocks |
-
-**Entry:** Pick stock with biggest 15-min range (0.5-3%). Limit order at OR High/Low at 9:36 AM. Cancel by 10:00 AM.
-
-**Exit:** SL: 2.0× range | Target: 3.0× range | EOD: 2:15 PM
-
----
-## 2. 📈 Monthly Momentum (Delivery) — +29% CAGR
+## 1. 📈 Monthly Momentum (Delivery) — +29% CAGR
 | Parameter | Value |
 |-----------|-------|
 | **Instrument** | Delivery (CNC), no leverage |
@@ -381,6 +369,18 @@ if page == "🏠 Overview":
 **Entry:** Last trading day of month. Top 3 by 3-month momentum. Filters: 3/3 consistency + within 10% of 52w high.
 
 **Exit:** Hold till next month-end. 20% SL (GTT order).
+
+---
+## 2. 🎯 Multi-Stock ORB (Intraday) — +44% CAGR
+| Parameter | Value |
+|-----------|-------|
+| **Instrument** | Intraday (MIS), 5x leverage |
+| **Capital** | ₹1,20,000 |
+| **Universe** | 87 F&O stocks (9 sector indices) |
+
+**Entry:** Scan all 87 stocks at 9:30. Filter OR range 0.7-1.5%. OR close filter (LONG if >70%, SHORT if <30%). Pick top 3. SL-M order at OR level.
+
+**Exit:** SL: 0.75× OR range | Target: 3× OR range | EOD: 3:15 PM
 
 ---
 ## 3. 🔥 EMA Stack Swing (Delivery) — +94% CAGR
@@ -393,18 +393,6 @@ if page == "🏠 Overview":
 **Entry:** EMA 5>10>20>50 + Vol>1.5x + 5d return>3%. Buy at 3:25 PM close.
 
 **Exit:** Sell at close after 5 trading days. No SL. Max 3 positions.
-
----
-## 4. 🎯 Multi-Stock ORB (Intraday) — +88% CAGR
-| Parameter | Value |
-|-----------|-------|
-| **Instrument** | Intraday (MIS), 5x leverage |
-| **Capital** | ₹1,20,000 |
-| **Universe** | 87 F&O stocks (9 sector indices) |
-
-**Entry:** Scan all 87 stocks at 9:30. Filter OR range 0.7-1.5%. Pick top 3 by OR size. Market order on breakout (9:36-10:00 AM).
-
-**Exit:** SL: opposite side of OR | Target: 3× OR range | EOD: 3:15 PM
     """)
 elif page == "📈 Monthly Momentum":
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Portfolio", "📈 Chart", "🔍 Ranking", "🔄 Rebalance"])
