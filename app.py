@@ -498,21 +498,21 @@ elif page == "🔥 Swing Futures":
 
 elif page == "🎯 Multi-Stock ORB":
     st.title("🎯 Multi-Stock ORB — Intraday")
-    st.caption("87 F&O Stocks | OR 0.7-1.5% | Top 3 | Entry 9:36-10:00 | Exit 3:15 PM | 88% CAGR")
+    st.caption("87 F&O Stocks | OR 0.7-1.5% | OR Close Filter | Top 3 | Entry 9:36-10:00 | Exit 3:15 PM | 44% CAGR")
 
     # Backtest results
     st.subheader("📊 Backtest Results (2018-2024)")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("CAGR", "87.7%")
-    col2.metric("Max Drawdown", "-27.2%")
-    col3.metric("Win Rate", "~49%")
+    col1.metric("CAGR", "44%")
+    col2.metric("Max Drawdown", "-51%")
+    col3.metric("Win Rate", "~44%")
     col4.metric("Trades/Day", "3")
 
     yearly_data = {
         "Year": [2018, 2019, 2020, 2021, 2022, 2023, 2024],
-        "Return": [131.9, 29.9, 145.5, 137.3, 134.1, 14.4, 74.7],
-        "Trades": [735, 732, 712, 741, 738, 735, 744],
-        "Win%": [49.0, 46.6, 49.0, 50.2, 51.2, 49.3, 46.1],
+        "Return": [85.3, -0.1, 83.3, 72.1, 23.6, 21.8, 45.6],
+        "Trades": [733, 732, 678, 735, 731, 735, 741],
+        "Win%": [44.6, 41.1, 44.7, 44.1, 41.9, 46.7, 42.0],
     }
     ydf = pd.DataFrame(yearly_data)
 
