@@ -34,6 +34,7 @@ MAX_TRADES = 3
 MIN_RANGE_PCT = 0.7
 MAX_RANGE_PCT = 1.5
 TARGET_MULT = 3.0
+SL_MULT = 0.75  # SL at 0.75x OR range from entry
 CHARGES = 100  # per trade approx
 
 STOCKS = [
@@ -119,12 +120,25 @@ def scan_stocks():
             if or_pct < MIN_RANGE_PCT or or_pct > MAX_RANGE_PCT:
                 continue
 
+            # OR close position filter
+            or_close = float(or_candles.iloc[-1]['Close'])
+            or_close_pos = (or_close - or_low) / or_range
+            # Only LONG if OR closed near high (>0.7), SHORT if near low (<0.3)
+            if or_close_pos > 0.7:
+                direction = "LONG"
+            elif or_close_pos < 0.3:
+                direction = "SHORT"
+            else:
+                continue  # skip — no clear direction
+
             candidates.append({
                 'stock': stock,
                 'or_high': or_high,
                 'or_low': or_low,
                 'or_range': or_range,
                 'or_pct': or_pct,
+                'direction': direction,
+                'or_close_pos': round(or_close_pos, 2),
             })
         except:
             continue
@@ -169,15 +183,20 @@ def run():
         msg_lines = [f"🎯 MULTI-ORB LEVELS ({today})\n"]
         for i, p in enumerate(picks, 1):
             qty = int(PER_TRADE / p['or_high'])
-            target_l = p['or_high'] + p['or_range'] * TARGET_MULT
-            target_s = p['or_low'] - p['or_range'] * TARGET_MULT
-            # Write to sheet: Date, Stock, OR High, OR Low, OR%, Direction, Entry, SL, Target, Exit, Exit Reason, P&L, Status
-            ws.append_row([today, p['stock'], round(p['or_high'], 2), round(p['or_low'], 2),
-                          round(p['or_pct'], 2), '', '', '', '', '', '', '', 'WATCHING'])
-            msg_lines.append(f"#{i} {p['stock']} (OR {p['or_pct']:.1f}%)")
-            msg_lines.append(f"   High: {p['or_high']:.1f} | Low: {p['or_low']:.1f}")
-            msg_lines.append(f"   BUY>{p['or_high']:.1f} TGT {target_l:.1f} | SHORT<{p['or_low']:.1f} TGT {target_s:.1f}")
+            if p['direction'] == "LONG":
+                target = p['or_high'] + p['or_range'] * TARGET_MULT
+                sl = p['or_high'] - p['or_range'] * SL_MULT
+                msg_lines.append(f"#{i} {p['stock']} 🟢 LONG (OR {p['or_pct']:.1f}%, close pos {p['or_close_pos']})")
+                msg_lines.append(f"   BUY @ {p['or_high']:.1f} | SL {sl:.1f} | TGT {target:.1f}")
+            else:
+                target = p['or_low'] - p['or_range'] * TARGET_MULT
+                sl = p['or_low'] + p['or_range'] * SL_MULT
+                msg_lines.append(f"#{i} {p['stock']} 🔴 SHORT (OR {p['or_pct']:.1f}%, close pos {p['or_close_pos']})")
+                msg_lines.append(f"   SELL @ {p['or_low']:.1f} | SL {sl:.1f} | TGT {target:.1f}")
             msg_lines.append("")
+            # Write to sheet
+            ws.append_row([today, p['stock'], p['direction'], round(p['or_high'], 2), round(p['or_low'], 2),
+                          round(p['or_pct'], 2), p['or_close_pos'], '', '', '', '', '', '', '', 'WATCHING'])
 
         msg_lines.append(f"Entry: 9:36-10:00 AM | Exit: 3:15 PM")
         send_telegram("\n".join(msg_lines))
@@ -206,31 +225,32 @@ def run():
             if price is None:
                 continue
 
-            if price > or_high:
-                # LONG breakout
+            direction = row_data.get('Direction', '')
+            
+            if direction == 'LONG' and price > or_high:
                 entry = or_high
-                sl = or_low
+                sl = entry - or_range * SL_MULT
                 target = entry + or_range * TARGET_MULT
                 qty = int(PER_TRADE / entry)
                 pnl_risk = round((sl - entry) * qty)
-                ws.update(f'F{row_num}:M{row_num}', [['LONG', round(entry, 2), round(sl, 2), round(target, 2), '', '', '', 'IN TRADE']])
+                now_time = now_ist.strftime('%H:%M')
+                ws.update(f'H{row_num}:O{row_num}', [[round(entry, 2), now_time, round(sl, 2), round(target, 2), '', '', '', 'IN TRADE']])
                 send_telegram(f"🟢 BUY {stock} @ {entry:.1f}\nSL: {sl:.1f} | TGT: {target:.1f}\nQty: {qty} | Risk: Rs{abs(pnl_risk):,}")
                 print(f"LONG {stock} at {entry:.1f}")
 
-            elif price < or_low:
-                # SHORT breakout
+            elif direction == 'SHORT' and price < or_low:
                 entry = or_low
-                sl = or_high
+                sl = entry + or_range * SL_MULT
                 target = entry - or_range * TARGET_MULT
                 qty = int(PER_TRADE / entry)
                 pnl_risk = round((sl - entry) * qty)
-                ws.update(f'F{row_num}:M{row_num}', [['SHORT', round(entry, 2), round(sl, 2), round(target, 2), '', '', '', 'IN TRADE']])
+                now_time = now_ist.strftime('%H:%M')
+                ws.update(f'H{row_num}:O{row_num}', [[round(entry, 2), now_time, round(sl, 2), round(target, 2), '', '', '', 'IN TRADE']])
                 send_telegram(f"🔴 SHORT {stock} @ {entry:.1f}\nSL: {sl:.1f} | TGT: {target:.1f}\nQty: {qty} | Risk: Rs{abs(pnl_risk):,}")
                 print(f"SHORT {stock} at {entry:.1f}")
 
             elif now_ist.hour >= 10:
-                # Deadline passed, no breakout
-                ws.update(f'F{row_num}:M{row_num}', [['NO ENTRY', '', '', '', '', '', '', 'CLOSED']])
+                ws.update(f'O{row_num}', [['CLOSED']])
                 print(f"{stock}: No breakout by 10:00 AM. Skipped.")
 
             continue
@@ -271,7 +291,7 @@ def run():
                 else:
                     pnl = round((entry - exit_price) * qty) - CHARGES
 
-                ws.update(f'I{row_num}:M{row_num}', [[round(exit_price, 2), exit_reason, pnl, '', 'CLOSED']])
+                ws.update(f'L{row_num}:O{row_num}', [[round(exit_price, 2), exit_reason, pnl, 'CLOSED']])
                 emoji = '🟢' if pnl > 0 else '🔴'
                 send_telegram(f"{emoji} EXIT {stock} ({direction})\nEntry: {entry:.1f} | Exit: {exit_price:.1f}\nReason: {exit_reason} | P&L: Rs{pnl:+,}")
                 print(f"EXIT {stock}: {exit_reason}, P&L: Rs{pnl:+,}")

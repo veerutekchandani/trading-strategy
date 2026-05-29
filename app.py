@@ -352,7 +352,7 @@ def show_intraday():
 
 
 st.sidebar.title("📱 Strategy")
-page = st.sidebar.radio("Select", ["🏠 Overview", "📈 Monthly Momentum", "⚡ Intraday ORB", "🔥 Swing Futures", "🎯 Multi-Stock ORB"])
+page = st.sidebar.radio("Select", ["🏠 Overview", "📈 Monthly Momentum", "🔥 Swing Futures", "🎯 Multi-Stock ORB"])
 
 if page == "🏠 Overview":
     st.title("🏠 Strategy Portfolio — Overview")
@@ -383,16 +383,16 @@ if page == "🏠 Overview":
 **Exit:** Hold till next month-end. 20% SL (GTT order).
 
 ---
-## 3. 🔥 Volume Breakout Swing (Futures) — +33.5% CAGR
+## 3. 🔥 EMA Stack Swing (Delivery) — +94% CAGR
 | Parameter | Value |
 |-----------|-------|
-| **Instrument** | Stock Futures (NRML), ~5x leverage |
-| **Capital** | ₹5,00,000 margin |
-| **Universe** | ~210 F&O stocks |
+| **Instrument** | Delivery (CNC), no leverage |
+| **Capital** | ₹6,00,000 (3 slots × ₹2L) |
+| **Universe** | 87 F&O stocks |
 
-**Entry:** Vol>2.5x + Strong close (top 30%) + EMA20>EMA50 + 20d return>10% + ATR<4% + Nifty>50EMA
+**Entry:** EMA 5>10>20>50 + Vol>1.5x + 5d return>3%. Buy at 3:25 PM close.
 
-**Exit:** SL: 1.5×ATR (GTT) | Target: 2.5×ATR | Max hold: 5 days | Max 3 positions
+**Exit:** Sell at close after 5 trading days. No SL. Max 3 positions.
 
 ---
 ## 4. 🎯 Multi-Stock ORB (Intraday) — +88% CAGR
@@ -419,9 +419,9 @@ elif page == "📈 Monthly Momentum":
 elif page == "⚡ Intraday ORB":
     show_intraday()
 elif page == "🔥 Swing Futures":
-    # Swing Futures page
-    st.title("🔥 Volume Breakout Swing — Futures")
-    st.caption("F&O Stocks | Vol>2.5x | Strong Close | EMA Stack | ATR<4% | Nifty>50EMA | SL 1.5×ATR | TGT 2.5×ATR | 5-day hold")
+    # Swing page
+    st.title("🔥 EMA Stack Swing — Delivery")
+    st.caption("87 F&O Stocks | EMA 5>10>20>50 | Vol>1.5x | 5d ret>3% | Hold 5 days | No SL | 94% CAGR")
 
     # Live trade status from Google Sheet
     try:
